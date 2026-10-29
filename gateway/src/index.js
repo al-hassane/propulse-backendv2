@@ -6,7 +6,7 @@ const app = express();
 const PORT = Number(process.env.PORT || 8080);
 const PROPULSE_TIMEOUT_MS = Number(process.env.PROPULSE_TIMEOUT_MS || 120000);
 const SERVICES = {
-  propulse: process.env.PROPULSE_URL || 'http://propulse:3000',
+  propulse: process.env.PROPULSE_URL || 'http://propulse:3001',
   streamapi: process.env.STREAMAPI_URL || 'http://streamapi:3010',
 };
 const balancer = new LoadBalancer(SERVICES, {

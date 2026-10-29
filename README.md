@@ -2,7 +2,7 @@
 
 Minimal runnable demo containing:
 - API Gateway on `http://localhost:8080`
-- ProPulse API (`propulse:3000`) with Postgres and Redis
+- ProPulse API (`propulse:3001`) with Postgres and Redis
 - Reels video read API (`streamapi:3010`)
 - Docker Compose orchestration and Docker DNS service discovery
 
@@ -81,7 +81,7 @@ Set the initial strategy with `LB_STRATEGY` (`round-robin`, `least-connections`,
 
 The gateway receives these internal base URLs from Compose:
 
-- `PROPULSE_URL=http://propulse:3000`
+- `PROPULSE_URL=http://propulse:3001`
 - `STREAMAPI_URL=http://streamapi:3010`
 
 Docker DNS resolves `propulse` and `streamapi` to every replica address on the shared `backend` network. The gateway refreshes that list, drops replicas that fail `/health`, and distributes requests itself. No service registration or heartbeat code is required for this starter.
