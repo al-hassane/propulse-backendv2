@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: propulse
+      POSTGRES_PASSWORD: propulse
+      POSTGRES_DB: propulse
+    volumes:
+      - propulse-pg:/var/lib/postgresql/data
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U propulse -d propulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  propulse:
+    build: ./propulse_backend
+    env_file:
+      - ./propulse_backend/.env
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://propulse:propulse@postgres:5432/propulse
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3000"
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${PROPULSE_REPLICAS:-1}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  streamapi:
+    build: ./streamapi
+    env_file:
+      - ./propulse_backend/.env
+    environment:
+      PORT: 3010
+      DATABASE_URL: postgresql://propulse:propulse@postgres:5432/propulse
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3010"
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      propulse:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${STREAMAPI_REPLICAS:-1}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  gateway:
+    build: ./gateway
+    environment:
+      PORT: 8080
+      PROPULSE_URL: http://propulse:3000
+      STREAMAPI_URL: http://streamapi:3010
+      PROPULSE_TIMEOUT_MS: ${PROPULSE_TIMEOUT_MS:-120000}
+      LB_STRATEGY: ${LB_STRATEGY:-round-robin}
+      REPLICA_REFRESH_MS: ${REPLICA_REFRESH_MS:-5000}
+    ports:
+      - "8080:8080"
+    networks: [backend]
+    depends_on:
+      propulse:
+        condition: service_healthy
+      streamapi:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  propulse-pg:

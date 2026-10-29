@@ -1,0 +1,7 @@
+{
+  "name": "node-microservices-v1",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Node.js microservices demo with API gateway, service registry and Docker Compose",
+  "scripts": {"check": "echo 'Run services with docker compose up --build'"}
+}
