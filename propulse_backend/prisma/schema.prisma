@@ -1,0 +1,2755 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum CertifTier {
+  NONE
+  PREMIUM
+  GOLD
+  ELITE
+}
+
+enum CertifStatus {
+  INCOMPLETE
+  PENDING_DOCS
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+
+
+model User {
+  id        Int      @id @default(autoincrement())
+  fullName  String
+  // --- NOUVEAUX CHAMPS ÉLITE CV ---
+  firstName       String?
+  lastName        String?
+  ovr             Int       @default(60) // La note globale (Calculée par l'IA ou le serveur)
+  
+  // sportAttributes stockera tout le "plus" spécifique (ex: { "vitesse": 90, "detente": 80 })
+  sportAttributes Json?     @default("{}") 
+  city            String?
+  cityBackfillAttempts      Int      @default(0)  //Compteur d'échecs de reverse geocoding
+  country         String?   @default("Sénégal")
+  nationalities   String[]  // Spécifique PostgreSQL : permet de stocker ["Sénégal", "France"]
+  
+  cvCompleted     Boolean   @default(false) // Pour savoir s'il a fini de remplir son CV
+  eliteCV   Json?
+  // ---------------------------------
+  // AJOUT DU CHAMP USERNAME (UNIQUE)
+  username  String?  @unique 
+  nameUpdatedAt     DateTime? // Enregistre la date du dernier changement de nom
+  email           String?  @unique // Devient optionnel car on peut s'inscrire par téléphone
+  phoneNumber     String?  @unique // AJOUTE CETTE LIGNE
+  phoneCountryCode String?  
+  password  String
+  role      String   
+  isVerified Boolean @default(false)
+  certifTier      CertifTier       @default(NONE) //Nouveau : Palier de certification actif
+
+  acceptedTermsAt DateTime? // Enregistre quand l'utilisateur a accepté
+
+  // --- AJOUTE CE CHAMP POUR LA MODÉRATION ---
+  suspendedUntil DateTime? 
+
+  // --- AJOUTE CE CHAMP ---
+  sport     String?  // Nullable car un manager ou un admin n'en a pas forcément
+  
+  // Stats
+  position    String?
+  club        String?
+  strongFoot  String?
+  height      Int?
+  weight      Int?
+  birthDate   DateTime?
+  bio         String?  @db.Text
+  
+  // --- IMAGES DE PROFIL (C'est ce qu'il manquait !) ---
+  coverUrl    String?  // <--- AJOUTE ÇA
+
+  // Ajoute ou modifie cette ligne :
+  avatarUrl String? @default("https://d21bhgmu32o7ny.cloudfront.net/propulse_app/default-avatar.png")
+  eliteCardUrl  String?  // NOUVEAU : Photo spécifique pour le CV Elite
+  eliteCardUrlLight String?  // Image mode clair (upload par l'admin)
+  
+  createdAt DateTime @default(now())
+
+  // --- NOUVEAUX CHAMPS DASHBOARD ---
+  xp              Int      @default(0)    // Points totaux
+  level           Int      @default(1)    // Niveau (ex: Rookie, Espoir, Pro, Élite)
+
+  // --- STREAK DE PUBLICATION (Feature #1) ---
+  postStreakCount     Int       @default(0)      // Nombre de jours consécutifs avec un post
+  postStreakLastDate  DateTime?                  // Date du dernier post
+  postStreakMax       Int       @default(0)      // Meilleur streak jamais atteint
+  postStreakBadge     String?   @default("none") // none, bronze, silver, gold, legend
+
+
+  // Relations
+  posts     Post[]
+  likes     Like[]
+  ratings   Rating[]
+
+  // --- AJOUTE CETTE LIGNE ICI ---
+  events    Event[]
+  eventTicketPayments EventTicketPayment[] @relation("EventTicketBuyer")  
+  
+  // Système de Follow
+  followedBy Follow[] @relation("following")
+  following  Follow[] @relation("follower")
+
+  // Système de Partage (Messages reçus/envoyés)
+  sharesSent     Share[] @relation("sender")
+  sharesReceived Share[] @relation("receiver")
+
+  // --- AJOUTE CES 3 LIGNES ---
+  savedPosts  SavedPost[]
+  reports     Report[]
+  hiddenPosts HiddenPost[]
+
+ tournamentMatchesAsPlayerA  TournamentMatch[]  @relation("TournamentMatchPlayerA")
+  tournamentMatchesAsPlayerB  TournamentMatch[]  @relation("TournamentMatchPlayerB")
+  tournamentMatchesWon        TournamentMatch[]  @relation("TournamentMatchWinner")
+  ownedOrganizations Organization[] @relation("OwnedOrganizations")
+  memberOfOrganizations Organization[] @relation("OrganizationMembers")
+
+  eventPayouts    EventPayout[] @relation("ManagerPayouts")
+
+  reactions OrganizationPostReaction[]
+
+  orgPostVotes OrganizationPostVote[]
+
+
+
+  orgPosts           OrganizationPost[]
+  orgPostLikes       OrganizationPostLike[]
+  orgPostComments    OrganizationPostComment[]
+  followedOrgs       OrganizationFollow[]
+
+  organizationRequests    OrganizationRequest[]
+  organizationInvitations OrganizationInvitation[]
+
+  savedOrgPosts    SavedOrganizationPost[]
+  hiddenOrgPosts   HiddenOrganizationPost[]
+
+  orgCommentLikes OrganizationCommentLike[]
+
+  mutedOrganizations MutedOrganization[] 
+
+  // --- AJOUTE CETTE LIGNE ---
+  broadcastViews    BroadcastView[]
+  storyAudios   StoryAudio[]   // Tous les sons créés par ce user
+  storyAudioLikes StoryAudioLike[]
+
+  // --- AJOUTE CES 3 LIGNES POUR LA CONFIDENTIALITÉ ---
+  isPrivateProfile Boolean @default(false)      // Profil privé ?
+  allowMessages    String  @default("EVERYONE") // Qui peut m'écrire ? (EVERYONE, FOLLOWERS, NONE)
+  showOnlineStatus Boolean @default(true)       // Montrer "En ligne" ?
+  allowRatings     String  @default("EVERYONE") // AJOUTÉ : Qui peut m'évaluer ? (EVERYONE, FOLLOWERS, NONE)
+
+  // Relation pour les bloqués
+  blockedUsers     Block[] @relation("blocker")
+  blockedBy        Block[] @relation("blocked")
+
+  // --- AJOUTE CES 2 LIGNES ---
+  notificationsReceived Notification[] @relation("NotifReceiver")
+  notificationsSent     Notification[] @relation("NotifSender")
+
+  // --- CHAMPS SPÉCIFIQUES MANAGER ---
+  managerType         String?  // "CLUB", "ACADEMY", "SELECTION", "OTHER"
+  managerOtherDetail  String?  // Si "Autre", on stocke le détail ici
+  
+  // Documents de vérification (Chemins des fichiers)
+  verificationSelfie  String?
+  verificationDocType String?  // "ID_CARD" ou "DIPLOMA"
+  verificationDocFront String?
+  verificationDocBack  String?
+  eliteCardUpdatedAt  DateTime? // Pour suivre la dernière modification de la Pro Card
+  eliteCvValidated Boolean @default(false) // Nouveau champ dédié au CV
+  elitePackOpened Boolean @default(false) // Savoir si l'animation a déjà été vue
+  
+  // Statut
+  isManagerVerified   Boolean @default(false) // Deviendra true après validation par admin
+  managerRequestDate  DateTime? // Date de la demande
+
+  managerCertification ManagerCertification?
+
+  eventParticipations EventParticipant[]
+
+  targets    TargetPlayer[] @relation("ManagerTargets")
+  targetedBy TargetPlayer[] @relation("PlayerCible")
+
+  ownedCommunities Community[] @relation("OwnedCommunity")
+  memberOf         Community[] @relation("CommunityMembers")
+  // --- AJOUTEZ CETTE LIGNE ---
+  communityRequests CommunityRequest[]
+
+  certification PlayerCertification?
+  certifPayments  CertificationPayment[] //Nouveau : Lien vers l'historique des paiements de certif 
+
+  duelVotes DuelVote[]
+
+  ratingLikes RatingLike[]
+
+  supportTickets SupportTicket[]
+  contactMessages ContactMessage[]
+
+  // --- AJOUTE CES LIGNES POUR LES STORIES ---
+  stories        Story[]
+  storyLikes     StoryLike[]
+  storyComments  StoryComment[]
+  storyViews     StoryView[]
+  storyFlames    StoryFlame[]
+  storyPollVotes StoryPollVote[]
+  // --- AJOUTE CETTE LIGNE ICI ---
+  pollVotes PollVote[]
+  newsReactions NewsReaction[]
+  savedNews SavedNews[]
+  savedStories SavedStory[]
+  isApplePrivateRelay Boolean @default(false) 
+  // ------------------------------------------
+
+  careerSteps CareerStep[]
+  trophies   Trophy[]
+
+  storyMentions StoryMention[]
+  postMentions PostMention[]
+
+  shopLikes       ShopLike[]
+  savedProducts   SavedProduct[]
+  searches SearchHistory[]
+
+  chatTabs ChatTab[]
+
+
+  mutedUsers Mute[] @relation("UserMutes")
+  mutedBy    Mute[] @relation("UserMutedBy")
+
+  viewsGiven    ProfileView[] @relation("ViewerRelation")
+  viewsReceived ProfileView[] @relation("OwnerRelation")
+
+   showProfileViews  Boolean  @default(true) 
+   isDefaultStarter Boolean @default(false) // AJOUTE CETTE LIGNE
+   tacticalRole     String? // <--- AJOUTE CETTE LIGNE (Ex: "GK", "DC", "MC", "ATT")
+   jerseyNumber     Int?     // Numéro de maillot du joueur
+
+
+  shop          Shop?          // Un user peut avoir une boutique (optionnel)
+  productLikes  ProductLike[]  // Un user peut liker plein de produits
+  orders        Order[]        // Un user peut passer plein de commandes
+  shopMemberships  ShopMember[] 
+
+  createdTournaments    Tournament[] @relation("TournamentCreator")
+  tournamentParticipations TournamentParticipant[]
+
+  tournamentMatchComments TournamentMatchComment[] @relation("TournamentMatchCommentAuthor")
+
+  // --- AJOUTE CES 2 LIGNES ---
+  isEmailVerified   Boolean @default(false)
+  verificationToken String? @db.Text // Token temporaire pour le lien
+  verificationTokenExpiresAt DateTime?
+  // ---------------------------
+
+
+  liveStreams LiveStream[]
+
+  // --- AJOUTE CE CHAMP ---
+  pushToken String?  // Le token Expo pour les notifs
+
+  dismissedSuggestions SuggestionDismiss[] @relation("DismissingUser")
+  dismissedBy          SuggestionDismiss[] @relation("DismissedTarget")
+
+  // AJOUTS POUR LE PARRAINAGE
+  referralCode    String?   @unique  // Son propre code (ex: MOUSSA123)
+  referredById    Int?                          // L'ID de celui qui l'a parrainé
+  referredBy      User?    @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals       User[]   @relation("UserReferrals")
+
+  behaviors UserBehavior[]
+   // ... tes champs actuels
+  aiProScore      Float?    @default(0)   // Note de 0 à 100 calculée par l'IA
+  aiTalentGroup   String?   // "TOP_ESPOIR", "SOLIDE", "EN_PROGRESSION"
+  trustIndex      Float     @default(1.0) // Indice de confiance (pour le Predictive Rating)
+
+  ascId   Int?
+  asc     Asc?   @relation("PlayerAsc", fields: [ascId], references: [id])
+  matchComments MatchComment[]
+
+  latitude        Float?    // Position Nord/Sud
+  longitude       Float?    // Position Est/Ouest
+  lastLocUpdate   DateTime? // Pour savoir si le joueur est toujours dans cette zone
+  lastActiveAt    DateTime?   //  NOUVEAU : Dernière connexion/action
+  proximityRadius Int     @default(10)  //  Rayon de recherche en km (10 par défaut)
+  batteryLevel    Int?      
+  
+  // NOUVELLES RELATIONS
+  proximityAlertsSent   ProximityAlert[] @relation("ProximitySender")
+  proximityAlertsReceived ProximityAlert[] @relation("ProximityReceiver")
+
+  careerInteractions CareerTeaserInteraction[]
+
+  sentMessages       Message[]
+  messageReports     MessageReport[]
+  conversationsAsU1  Conversation[]  @relation("User1Conv")
+  conversationsAsU2  Conversation[]  @relation("User2Conv")
+  messageReactions  MessageReaction[]
+
+
+  trainingSessions TrainingSession[]
+  trainingFeedbacks TrainingFeedback[] @relation("ReviewerRelation")
+  targetedInSessions TrainingTarget[] @relation("TargetRelation")
+  trainingStreak    Int @default(0)
+  lastTrainingAt    DateTime?
+
+  postViews UserPostView[]
+  trainingReactions TrainingReaction[]
+
+  referralProcessed Boolean  @default(false) //AJOUTE BIEN CETTE LIGNE
+
+  cvPayments CVPayment[]  // AJOUTE CETTE LIGNE
+
+  // AJOUTE ICI AVANT LA DERNIÈRE ACCOLADE
+  propulseAdImpressions PropulseAdImpression[]
+  propulseAdClicks      PropulseAdClick[]
+
+  // AJOUTER CETTE LIGNE (Relation vers la table de sessions) :
+  userSessions UserSession[]
+
+  // STREAK KUDOS (connexion quotidienne)
+  kudosStreakCount      Int       @default(0)   // Nombre de jours consécutifs
+  kudosStreakLastAt     DateTime?              // Dernière connexion qui a donné un Kudos
+  kudosStreakMax        Int       @default(0)   // Meilleur streak jamais atteint
+
+
+  kudosPurchases    KudosPurchase[]
+  kudosConversions  KudosConversion[]
+  kudosReceivedBalance  Int  @default(0)  //Solde de Kudos REÇUS (à convertir en argent)
+
+  storySliderVotes StorySliderVote[] // AJOUTÉ
+  kudosGiven    Kudos[]
+  kudosBalance      Int      @default(15)
+  lastDailyKudosAt  DateTime @default(now())
+
+}
+
+
+model Post {
+  id          Int      @id @default(autoincrement())
+  imageUrl    String?
+  thumbnailUrl String?
+  media       PostMedia[]
+  description String?  @db.Text
+
+  width       Int?
+  height      Int?
+
+  views       Int      @default(0)
+
+  sport          String?
+
+  location    String?
+  tags        String?
+  aiTags String?
+
+  createdAt   DateTime @default(now())
+
+  isArchived       Boolean @default(false)
+  commentsDisabled Boolean @default(false)
+
+  // NOUVEAU CHAMP : type de média, calculé une seule fois à la création
+  mediaType   MediaType @default(IMAGE)
+
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+
+  likes       Like[]
+  ratings     Rating[]
+  shares      Share[]
+
+  savedBy     SavedPost[]
+  reports     Report[]
+  hiddenBy    HiddenPost[]
+
+  notifications Notification[]
+  mentions PostMention[]
+
+  storiesWithThisPost Story[] @relation("SharedPosts")
+
+  communityId Int?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  duelsAsPost1 Duel[] @relation("DuelPost1")
+  duelsAsPost2 Duel[] @relation("DuelPost2")
+
+  hasPoll        Boolean   @default(false)
+  pollQuestion   String?
+  votes          PollVote[]
+  hideAiTags Boolean @default(false)
+
+  viewedBy UserPostView[]
+  sharedMessages Message[]
+  kudos    Kudos[]
+
+  audioId     Int?
+  audio       StoryAudio? @relation(fields: [audioId], references: [id], onDelete: SetNull)
+
+  // NOUVEL INDEX : couvre exactement le filtre de GET /users/:id/posts
+  @@index([userId, isArchived, communityId, mediaType, createdAt])
+}
+
+model PostMedia {
+  id     Int    @id @default(autoincrement())
+  url    String
+  postId Int
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// 2. Nouveau modèle pour enregistrer les votes des Reels
+model PollVote {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  option    String   // "YES" / "NO" ou "P1" / "P2"
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId]) // Un utilisateur ne vote qu'une fois par Reel
+}
+
+
+// --- NOUVELLES TABLES ---
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId]) // Un user ne peut liker qu'une seule fois un post
+}
+
+
+model Kudos {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  tier      String?  // "lion", "flamme", "or"... (null pour les anciens Kudos)
+  cost      Int      @default(0) // coût payé (0 pour les anciens)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@index([userId, createdAt])
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  score     Int      // Note sur 10
+  comment   String?  @db.Text
+  userId    Int
+  postId    Int
+
+  // ... champs existants
+  likes         RatingLike[] // Relation avec les likes de commentaires
+  // ...
+
+
+  // --- AJOUT POUR LES RÉPONSES ---
+  parentId  Int?     // Si rempli, c'est une réponse
+  parent    Rating?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Rating[] @relation("CommentReplies")
+  // -------------------------------
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+
+  // --- AJOUTE CETTE LIGNE ---
+  notifications Notification[]
+}
+
+model RatingLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  ratingId  Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Rating   @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, ratingId]) // Un utilisateur ne like qu'une fois
+}
+
+model Follow {
+  id          Int      @id @default(autoincrement())
+  followerId  Int
+  followingId Int
+   
+  //AJOUTE CETTE LIGNE :
+  notifLevel  String   @default("CUSTOM") // ALL, CUSTOM, NONE
+  // --- AJOUTE CETTE LIGNE ---
+  status      String   @default("ACCEPTED") // Valeurs: "ACCEPTED" ou "PENDING"
+  follower    User     @relation("follower", fields: [followerId], references: [id])
+  following   User     @relation("following", fields: [followingId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+// Pour partager un post à un ami dans l'app
+model Share {
+  id         Int      @id @default(autoincrement())
+  postId     Int
+  senderId   Int
+  receiverId Int
+  message    String?
+  
+  post       Post     @relation(fields: [postId], references: [id])
+  sender     User     @relation("sender", fields: [senderId], references: [id])
+  receiver   User     @relation("receiver", fields: [receiverId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+
+// Ajoute ça à la fin de ton fichier schema.prisma
+
+// 1. Pour les posts enregistrés
+model SavedPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId]) // Un user ne peut sauvegarder qu'une fois le même post
+}
+
+// 2. MODIFIER le modèle Report existant (ajoute storyId)
+model Report {
+  id         Int      @id @default(autoincrement())
+  reporterId Int
+  postId     Int?     // Devient optionnel
+  storyId    Int?     // AJOUT : Optionnel pour les stories
+   // AJOUTE CETTE LIGNE POUR LES PROFILS :
+  targetUserId Int? 
+   organizationId Int?  
+
+   //AJOUTE CES DEUX LIGNES
+  organizationPostId Int?             
+  organizationPost   OrganizationPost? @relation(fields: [organizationPostId], references: [id])
+
+
+  reason     String
+  details    String?  @db.Text
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  reporter   User     @relation(fields: [reporterId], references: [id])
+  post       Post?    @relation(fields: [postId], references: [id])
+  story      Story?   @relation(fields: [storyId], references: [id]) // AJOUT
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// 3. Pour "Ça ne m'intéresse pas" (Posts masqués)
+model HiddenPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+}
+
+// --- AJOUTE CETTE TABLE À LA FIN DU FICHIER ---
+model Block {
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id])
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  message       String?  @db.Text
+
+  receiverId Int
+  receiver   User @relation("NotifReceiver", fields: [receiverId], references: [id])
+
+  senderId   Int
+  sender     User @relation("NotifSender", fields: [senderId], references: [id])
+
+  postId     Int?
+  post       Post? @relation(fields: [postId], references: [id])
+
+  eventId   Int?
+  event     Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  orgPostId     Int?
+  orgPost       OrganizationPost? @relation(fields: [orgPostId], references: [id], onDelete: Cascade)
+
+  ratingId   Int?     
+  rating     Rating?  @relation(fields: [ratingId], references: [id])
+
+  requestStatus String @default("PENDING")
+
+  communityId   Int?
+  community     Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  storyId       Int?
+  story         Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  newsId    Int?
+  news      NewsArticle? @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  trainingId   Int?
+  training     TrainingSession? @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  //  CES 3 LIGNES SONT LE FIX
+  @@index([receiverId, createdAt(sort: Desc)])
+  @@index([receiverId, type])
+  @@index([receiverId, isRead])
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  type        String
+  description String?  @db.Text
+  
+  // VÉRIFIE QUE CES LIGNES SONT BIEN LÀ :
+  date        DateTime // <--- C'EST CA QUI BLOQUE
+  ageCategory String?
+  isFree      Boolean  @default(true)
+  price       Float?
+  currency    String?
+  country     String?
+  city        String?
+  location    String
+  imageUrl    String?
+  
+  status      String   @default("UPCOMING")
+  createdAt   DateTime @default(now())
+
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+
+  //AJOUT Relation avec la communauté/club
+  communityId Int?     
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+   payout        EventPayout?
+   ticketPayments  EventTicketPayment[]
+
+  participants EventParticipant[]
+  notifications Notification[]
+}
+
+//NOUVEAU : Informations de payout pour un événement payant
+model EventPayout {
+  id              Int      @id @default(autoincrement())
+  
+  // Relation 1-1 avec l'événement
+  eventId         Int      @unique
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  // Manager qui reçoit l'argent
+  managerId       Int
+  manager         User     @relation("ManagerPayouts", fields: [managerId], references: [id], onDelete: Cascade)
+  
+  // Méthode choisie : "WAVE", "ORANGE_MONEY", "CARD"
+  paymentMethod   String
+  
+  // Pour Wave / Orange Money
+  payoutPhone     String?  // Ex: "771234567"
+  payoutFullName  String?  // Nom complet du titulaire
+  
+  // Pour Carte bancaire ( on stocke UNIQUEMENT un token, jamais les données brutes)
+  cardToken       String?  // Token PayTech/Stripe (jamais le numéro)
+  cardLast4       String?  // "4242" pour affichage
+  cardBrand       String?  // "visa", "mastercard"
+  
+  // Métadonnées
+  isVerified      Boolean  @default(false) // Vérifié par PayTech/Stripe ?
+  isActive        Boolean  @default(true)  // Actif pour les prochains events ?
+  saveForNext     Boolean  @default(false) // Sauvegarder pour les prochains événements ?
+  
+  // Statistiques
+  totalReceived   Float    @default(0)     // Total reçu (via IPN)
+  totalPayouts    Float    @default(0)     // Total versé au manager
+  platformFee     Float    @default(0)     // Commission ProPulse
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([managerId])
+  @@index([paymentMethod])
+}
+
+model EventTicketPayment {
+  id              Int      @id @default(autoincrement())
+  buyerId         Int
+  buyer           User     @relation("EventTicketBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  eventId         Int
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  amountXof       Int
+  currency        String   @default("XOF")
+  platformFeePct  Int      @default(10)
+  platformFeeXof  Int      @default(0)
+  netForManager   Int      @default(0)
+  refCommand      String   @unique
+  token           String?
+  status          String   @default("PENDING")
+  paymentMethod   String?
+  paidAt          DateTime?
+  payoutStatus    String   @default("PENDING")
+  payoutRef       String?
+  payoutAt        DateTime?
+  payoutError     String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([buyerId, eventId])
+  @@index([status, paidAt])
+  @@index([eventId, status])
+}
+
+// Ajoute cette table pour lier les joueurs aux événements
+model EventParticipant {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId]) // Un joueur ne peut participer qu'une fois
+}
+
+// N'oublie pas d'ajouter cette ligne dans le modèle Event existant :
+// participants EventParticipant[]
+
+// Et celle-ci dans le modèle User :
+// eventParticipations EventParticipant[]
+
+
+
+model TargetPlayer {
+  id         Int      @id @default(autoincrement())
+  managerId  Int
+  playerId   Int
+  createdAt  DateTime @default(now())
+
+  manager    User     @relation("ManagerTargets", fields: [managerId], references: [id], onDelete: Cascade)
+  player     User     @relation("PlayerCible", fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, playerId])
+}
+
+
+
+model Community {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+  logo        String?  @default("https://d21bhgmu32o7ny.cloudfront.net/propulse_app/chatgpt_image_2.png")  // Logo par défaut
+  banner      String?  @default("https://d21bhgmu32o7ny.cloudfront.net/propulse_app/chatgpt_image_1.png") // Couverture par défaut
+  city        String
+  country     String
+  foundedIn   String?
+  isVerified  Boolean  @default(false)
+  category    String   @default("CLUB") // CLUB, ACADEMY, ASSOCIATION
+  isPrivate   Boolean  @default(false)
+
+  // Le créateur / administrateur du club
+  ownerId     Int
+  owner       User     @relation("OwnedCommunity", fields: [ownerId], references: [id])
+
+  // Les joueurs qui font partie de l'effectif
+  members     User[]   @relation("CommunityMembers")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  requests    CommunityRequest[]
+
+  posts       Post[]   // Un club peut avoir plusieurs posts
+  events      Event[]
+
+  notifications Notification[] // Relation inverse
+  certification CommunityCertification?
+}
+
+
+model CommunityRequest {
+  id          Int      @id @default(autoincrement())
+  communityId Int
+  userId      Int
+  createdAt   DateTime @default(now())
+
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+}
+
+
+
+model PlayerCertification {
+  id              Int          @id @default(autoincrement())
+  userId          Int          @unique
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Étape 1 : Informations d'identité (Tous paliers)
+  realFullName    String
+  birthDate       String
+  idCardNumber    String?
+  idCardPhoto     String?      // Photo d'identité (S3/CloudFront)
+
+  //Nouveaux justificatifs selon le palier demandé
+  clubProofPhoto  String?      // Requis pour GOLD (Licence, attestation)
+  proContractPhoto String?     // Requis pour ELITE (Contrat pro, sélection)
+
+  // Étape 2 : Configuration du palier et état
+  tier            CertifTier   @default(PREMIUM) //Palier demandé (PREMIUM, GOLD, ELITE)
+  status          CertifStatus @default(INCOMPLETE) // État du dossier sécurisé par l'Enum
+  reason          String?      @db.Text          // Motif si rejeté
+
+  // Étape 3 : Informations de paiement et passerelle
+  paymentStatus   Boolean      @default(false)
+  paymentMethod   String?      // "WAVE", "ORANGE_MONEY", "APPLE_IAP"
+  paymentGateway  String?      // "PAYTECH" ou "APPLE_IAP"
+  transactionId   String?      @unique // ID Wave/OM ou Token de reçu Apple
+  originalTransactionId String? @unique // Utile pour le renouvellement automatique iOS
+  paymentDate     DateTime?
+  
+  amount          Float        @default(1000)
+  expiryDate      DateTime?    // Date d'expiration (renouvelable chaque mois)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+
+
+model Duel {
+  id          Int      @id @default(autoincrement())
+  sport       String   @default("football")
+  
+  // Les deux posts (vidéos) en compétition
+  post1Id     Int
+  post2Id     Int
+  post1       Post     @relation("DuelPost1", fields: [post1Id], references: [id])
+  post2       Post     @relation("DuelPost2", fields: [post2Id], references: [id])
+
+  // --- AJOUTE CE CHAMP ---
+  winnerId    Int?     // Sera rempli quand le duel expire
+  // -----------------------
+
+  votes       DuelVote[]
+  
+  expiresAt   DateTime // Fin du duel (ex: 24h après)
+  createdAt   DateTime @default(now())
+}
+
+model DuelVote {
+  id        Int      @id @default(autoincrement())
+  duelId    Int
+  voterId   Int
+  votedFor  Int      // L'ID du joueur (userId) pour qui on a voté
+  createdAt DateTime @default(now())   // AJOUTE CETTE LIGNE
+  
+  duel      Duel     @relation(fields: [duelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+
+  @@unique([duelId, voterId]) // Un utilisateur ne vote qu'une fois par duel
+}
+
+
+
+model SupportTicket {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  category  String   // "BUG", "ACCOUNT", "PRIVACY", "OTHER"
+  subject   String
+  message   String   @db.Text
+  status    String   @default("OPEN") // OPEN, PENDING, CLOSED
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+model Story {
+  id          Int      @id @default(autoincrement())
+  mediaUrl    String?   // Image ou Vidéo
+  type        String   // "IMAGE" ou "VIDEO"
+  content     String?  @db.Text // Le texte à afficher
+  background  String?  // Contiendra soit "#color" soit "#color1,#color2"
+  fontStyle   String?  // <--- AJOUTE CETTE LIGNE ABSOLUMENT
+  textColor String? @default("#FFFFFF")
+  stickerStyle Int @default(0)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime // Date de fin (24h après)
+
+  sharedInMessages Message[] @relation("SharedStories")
+
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+   // --- NOUVEAUX CHAMPS CTO ---
+  sharedPostId Int?     // Optionnel : ID du post si c'est un partage
+  sharedPost   Post?    @relation("SharedPosts", fields: [sharedPostId], references: [id], onDelete: SetNull)
+  
+  mentions     StoryMention[] // Liste des personnes taguées
+  // ---------------------------
+
+  // REMPLACE audioUrl/audioDuration par une vraie relation :
+  storyAudioId  Int?
+  storyAudio    StoryAudio? @relation(fields: [storyAudioId], references: [id], onDelete: SetNull)
+
+
+  // AJOUTER CES LIGNES 
+  textScale     String?  @default("1")
+  textOffsetX   String?  @default("0")
+  textOffsetY   String?  @default("0")
+  textRotation  String?  @default("0")
+  stickers      String?  @default("[]")
+
+  // AJOUTEZ CES 5 COLONNES POUR LE POSITIONNEMENT ET LE FOND DU MÉDIA
+  mediaBgMode   String?  @default("blur")
+  mediaBgColor  String?  @default("#000000")
+  mediaScale    String?  @default("1")
+  mediaOffsetX  String?  @default("0")
+  mediaOffsetY  String?  @default("0")
+
+  likes       StoryLike[]
+  comments    StoryComment[]
+  views       StoryView[]
+  flames      StoryFlame[]
+
+  // --- AJOUTE CETTE LIGNE ICI ---
+  notifications Notification[]
+  // ------------------------------
+
+  savedBy SavedStory[]
+  reports Report[]
+  poll    StoryPoll? // AJOUTÉ : sondage optionnel lié à cette story
+
+  slider  StorySlider? // Correct : pointe vers le modèle StorySlider
+}
+
+model StoryLike {
+  id      Int   @id @default(autoincrement())
+  userId  Int
+  storyId Int
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story   Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  @@unique([userId, storyId])
+
+  // --- AJOUTE CETTE LIGNE ---
+  createdAt DateTime @default(now()) 
+  // --------------------------
+}
+
+
+model StoryComment {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  userId    Int
+  storyId   Int
+ 
+  //AJOUT POUR LES RÉPONSES (Live Chat style)
+  parentId  Int?    
+  parent    StoryComment?  @relation("StoryCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   StoryComment[] @relation("StoryCommentReplies")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model StoryView {
+  id      Int   @id @default(autoincrement())
+  userId  Int
+  storyId Int
+
+  // --- AJOUTE CETTE LIGNE ---
+  createdAt DateTime @default(now()) 
+  // --------------------------
+
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story   Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  @@unique([userId, storyId])
+}
+
+model StoryFlame {
+  id      Int   @id @default(autoincrement())
+  userId  Int
+  storyId Int
+
+  // --- AJOUTE CETTE LIGNE ---
+  createdAt DateTime @default(now()) 
+  // --------------------------
+
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story   Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  @@unique([userId, storyId])
+}
+
+
+model StoryPoll {
+  id         Int      @id @default(autoincrement())
+  storyId    Int      @unique // un seul sondage par story
+  story      Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  question   String
+  optionA    String
+  optionB    String
+
+  // Positionnement comme un sticker classique
+  x          Float    @default(0)
+  y          Float    @default(0)
+  scale      Float    @default(1)
+  rotation   Float    @default(0)
+
+  createdAt  DateTime @default(now())
+
+  votes      StoryPollVote[]
+}
+
+
+model StoryPollVote {
+  id        Int       @id @default(autoincrement())
+  pollId    Int
+  poll      StoryPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  // AJOUTER CES DEUX LIGNES (Relation avec l'utilisateur) :
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  choice    String    // "A" ou "B"
+
+  createdAt DateTime  @default(now())
+
+  @@unique([pollId, userId]) // empêche le double vote au niveau BDD
+}
+
+
+
+
+// --- E-COMMERCE / SHOPPING ---
+
+// 1. La Boutique (Une par utilisateur)
+model Shop {
+  id          Int      @id @default(autoincrement())
+  name        String   // Nom de la boutique (ex: "CR7 Store", "Dakar Sport")
+  description String?  @db.Text
+  logo        String?  // Logo de la boutique
+  cover       String?  // Image de couverture stylée
+  
+  // Contact spécifique pour la vente (WhatsApp, Tel)
+  whatsapp    String?  
+  address     String?
+  city        String?
+
+  isActive    Boolean  @default(true) // Le vendeur peut mettre sa boutique en vacances
+  createdAt   DateTime @default(now())
+
+  // --- NOUVEAUX CHAMPS PREMIUM ---
+  isPremium       Boolean  @default(false) // Si true = Badge Jaune + Illimité
+  premiumUntil    DateTime? // Date d'expiration de l'abonnement
+
+  // Relation avec le propriétaire (User)
+  ownerId     Int      @unique // Un user = Une boutique
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  mainBrand String? // "nike" | "adidas" | "puma" | "jordan" | "other" ..
+
+  products    Product[]
+  orders      Order[]
+  shopLikes   ShopLike[] 
+
+  // Membres de la boutique (Employés/Vendeurs)
+  members         ShopMember[]
+  
+  // Certification
+  certification   ShopCertification?
+}
+
+
+model ShopMember {
+  id        Int      @id @default(autoincrement())
+  shopId    Int
+  shop      Shop     @relation(fields: [shopId], references: id, onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: id)
+  role      String   @default("vendeur") // vendeur, manager, etc.
+  
+  createdAt DateTime @default(now())
+}
+
+model ShopCertification {
+  id             Int      @id @default(autoincrement())
+  shopId         Int      @unique
+  shop           Shop     @relation(fields: [shopId], references: id, onDelete: Cascade)
+  status         String   @default("PENDING_PAYMENT") // PENDING_PAYMENT, WAITING_APPROVAL, APPROVED, REJECTED
+  transactionId  String?  @unique
+  paymentMethod  String?  // WAVE, ORANGE_MONEY
+  expiryDate     DateTime?
+
+  //AJOUTE CETTE LIGNE ICI
+  reason         String?  @db.Text 
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// 2. Les Produits
+model Product {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  price       Float
+  oldPrice    Float?   // Pour faire des promos (prix barré)
+  
+  category    String   // "CHAUSSURES", "MAILLOTS", "EQUIPEMENTS", "ACCESSOIRES"
+  condition   String   // "NEUF", "TRÈS_BON_ETAT", "BON_ETAT", "SATISFAISANT"
+  
+  size        String?  // "42", "L", "M"
+  brand       String?  // "Nike", "Adidas"...
+
+  // --- AJOUTE CETTE LIGNE ---
+  views       Int      @default(0) // Compteur de vues, commence à 0
+  // --------------------------
+
+  discount    Int      @default(0) // Pourcentage de réduction (ex: 15 pour -15%)
+
+  isSold      Boolean  @default(false) // Si vendu, on ne l'affiche plus ou on met un badge "VENDU"
+  createdAt   DateTime @default(now())
+
+  shopId      Int
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  images      ProductImage[] // Plusieurs images par produit
+  likes       ProductLike[]  // Les gens peuvent liker un produit
+  
+  // Pour les commandes
+  orderItems  OrderItem[]
+  savedBy     SavedProduct[] 
+}
+
+// 3. Images des produits (Car un produit a besoin de plusieurs angles)
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  url       String
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// 4. Système de Likes pour les produits (Favoris)
+model ProductLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+// 5. Commandes (Optionnel pour V1, mais bien pour l'historique)
+model Order {
+  id          Int      @id @default(autoincrement())
+  buyerId     Int      // Qui achète
+  shopId      Int      // Chez qui
+  total       Float
+  status      String   @default("PENDING") // PENDING, CONFIRMED, DELIVERED, CANCELLED
+  createdAt   DateTime @default(now())
+
+  buyer       User     @relation(fields: [buyerId], references: [id])
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  price     Float   // Prix au moment de l'achat
+  
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+
+
+// --- GESTION DES SUGGESTIONS ---
+model SuggestionDismiss {
+  id        Int      @id @default(autoincrement())
+  userId    Int      // Celui qui refuse
+  targetId  Int      // Celui qui est refusé
+  createdAt DateTime @default(now())
+
+  user      User     @relation("DismissingUser", fields: [userId], references: [id], onDelete: Cascade)
+  target    User     @relation("DismissedTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId]) // On ne refuse qu'une fois
+}
+
+model AdminNotification {
+  id        Int      @id @default(autoincrement())
+  type      String   // "NEW_SHOP", "NEW_PRODUCT", "SHOP_UPDATE"
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+
+model NewsArticle {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String   @db.Text
+  imageUrl    String   // Image de couverture
+  source      String?  // Source de l'info (ex: "APS", "Wiwsport")
+  category    String   // "football", "basketball", "handball", "volleyball", "manager"
+  
+  views       Int      @default(0)
+  
+  // Système de réactions (Like/Dislike)
+  likes       NewsReaction[]
+   // --- AJOUTEZ CES DEUX LIGNES ---
+  savedBy   SavedNews[]
+  notifications Notification[] // Relation inverse
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NewsReaction {
+  id        Int         @id @default(autoincrement())
+  type      String      // "LIKE" ou "DISLIKE"
+  userId    Int
+  newsId    Int
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  news      NewsArticle @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, newsId]) // Un utilisateur ne peut réagir qu'une fois par article
+}
+
+
+
+
+model SavedNews {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  newsId    Int
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  news      NewsArticle @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, newsId]) // Empêche de doubler l'enregistrement
+}
+
+
+// 1. Nouveau modèle pour enregistrer les stories
+model SavedStory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  storyId   Int
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storyId]) // On ne peut enregistrer qu'une fois
+}
+
+model SystemConfig {
+  id                Int     @id @default(1)
+  isCertifEnabled   Boolean @default(true)
+
+  // Nouveaux champs dynamiques
+  playerPrice       Int     @default(1000)      // Prix joueur
+  clubPrice         Int     @default(100000)    // Prix club
+  shopPrice         Int     @default(5000)    
+  waveNumber        String  @default("77 000 00 00")
+  orangeMoneyNumber String  @default("77 111 11 11")
+}
+
+model Broadcast {
+  id          Int      @id @default(autoincrement())
+  title       String
+  body        String
+  targetRole  String   @default("ALL") // ALL, joueur, manager
+  createdAt   DateTime @default(now())
+
+  views BroadcastView[]
+}
+
+model BroadcastView {
+  id          Int       @id @default(autoincrement())
+  broadcastId Int
+  userId      Int
+  viewedAt    DateTime  @default(now())
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, userId]) // Empêche de compter 2 fois le même utilisateur
+}
+
+model StoryMention {
+  id      Int   @id @default(autoincrement())
+  storyId Int
+  userId  Int   // L'ID de l'utilisateur mentionné
+
+  story   Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, userId]) // Empêche de mentionner deux fois la même personne sur la même story
+}
+
+
+model PostMention {
+  id      Int   @id @default(autoincrement())
+  postId  Int
+  userId  Int   // L'ID de l'utilisateur mentionné
+
+  post    Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+
+model CommunityCertification {
+  id              Int       @id @default(autoincrement())
+  communityId     Int       @unique
+  community       Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  
+  // Champs pour l'auto-remplissage (données du contrat)
+  managerFullName String?
+  contactPhone    String?
+  contactEmail    String?
+  position        String?
+
+  status          String    @default("PENDING_PAYMENT") 
+  tier            CertifTier @default(PREMIUM) // Ajoute l'enum Tier si pas déjà fait
+  
+  paymentMethod   String?   
+  transactionId   String?   @unique
+  
+  expiryDate      DateTime?
+  lastReminderSent DateTime? // Pour le cron (ne pas spammer le manager)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+
+
+// --- FAVORIS BOUTIQUES ---
+model ShopLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  shopId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, shopId])
+}
+
+// --- PRODUITS ENREGISTRÉS (POUR PLUS TARD) ---
+model SavedProduct {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model SearchHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: id, onDelete: Cascade)
+  query     String   // Le mot recherché
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+
+
+model Mute {
+  id          Int      @id @default(autoincrement())
+  muterId     Int      // Celui qui met en sourdine (Moi)
+  mutedId     Int      // Celui qui est masqué (Le talent)
+  mutePosts   Boolean  @default(false)
+  muteStories Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  muter       User     @relation("UserMutes", fields: [muterId], references: [id], onDelete: Cascade)
+  muted       User     @relation("UserMutedBy", fields: [mutedId], references: [id], onDelete: Cascade)
+
+  @@unique([muterId, mutedId])
+}
+
+
+
+model ProfileView {
+  id             Int      @id @default(autoincrement())
+  viewerId       Int      // Celui qui regarde
+  profileOwnerId Int      // Celui qui est regardé
+  viewedAt       DateTime @default(now())
+  isRead Boolean @default(false) //AJOUTE CECI
+
+  viewer         User     @relation("ViewerRelation", fields: [viewerId], references: [id], onDelete: Cascade)
+  profileOwner   User     @relation("OwnerRelation", fields: [profileOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([viewerId, profileOwnerId]) // Un utilisateur n'apparaît qu'une fois dans la liste
+}
+
+
+model UserBehavior {
+  id          Int      @id @default(autoincrement())
+  userId      Int      // Qui fait l'action
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  targetPostId Int?    // Sur quel post
+  targetUserId Int?    // Sur quel profil
+ 
+  actionType  String   // "VIEW_DURATION", "PROFILE_VISIT", "SEARCH_CLICK", "REPLAY"
+  value       Float?   // Ex: 15.5 (secondes de vue)
+ 
+  sport       String?  // Sport concerné pour faciliter le tri IA
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([actionType])
+}
+
+
+
+
+
+
+// ==========================================
+//  STRUCTURE COMPÉTITION (NAVÉTANE ÉLITE)
+// ==========================================
+
+model Competition {
+  id          Int      @id @default(autoincrement())
+  name        String   // ex: "Navétane ProPulse"
+  year        String  
+  season      String  
+  regions     Region[]
+  createdAt   DateTime @default(now())
+}
+
+model Region {
+  id            Int          @id @default(autoincrement())
+  name          String      
+  departments   Department[]
+  competitionId Int
+  competition   Competition  @relation(fields: [competitionId], references: [id])
+}
+
+model Department {
+  id       Int    @id @default(autoincrement())
+  name     String
+  regionId Int
+  region   Region @relation(fields: [regionId], references: [id])
+  zones    Zone[]
+}
+
+model Zone {
+  id           Int        @id @default(autoincrement())
+  name         String    
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id])
+  ascs         Asc[]      
+  matches      Match[]    
+  standings    Standing[]
+}
+
+model Asc {
+  id          Int       @id @default(autoincrement())
+  name        String    
+  logo        String?
+  formation   String    @default("4-4-2") // <--- AJOUTE CETTE LIGN  
+  zoneId      Int
+  zone        Zone      @relation(fields: [zoneId], references: [id])
+ 
+  homeMatches Match[]   @relation("HomeTeam")
+  awayMatches Match[]   @relation("AwayTeam")
+  players     User[]    @relation("PlayerAsc")
+  standings   Standing[]
+  createdAt   DateTime @default(now())
+}
+
+model Match {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  stadium     String?  
+  status      String   @default("SCHEDULED") // SCHEDULED, LIVE, FINISHED
+
+  homeTeamId  Int
+  homeTeam    Asc      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  homeScore   Int      @default(0)
+
+  awayTeamId  Int
+  awayTeam    Asc      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  awayScore   Int      @default(0)
+
+  zoneId      Int
+  zone        Zone     @relation(fields: [zoneId], references: [id])
+ 
+  // --- NOUVEAUX CHAMPS ÉLITE ---
+  events      MatchEvent[]
+  lineups     MatchLineup[]
+  stats       MatchStats?
+  liveChat    MatchComment[]
+  startTime  DateTime?
+  elapsedSeconds Int @default(0) // Stocke le cumul du temps passé
+  extraTime Int @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MatchEvent {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  type      String   // GOAL, YELLOW_CARD, RED_CARD, SUB
+  minute    Int
+  teamId    Int      // ID de l'ASC
+  playerName String? // Nom du buteur/fautif
+  playerId   Int?    // Optionnel: lien vers un User ProPulse
+}
+
+model MatchLineup {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  teamId    Int
+  playerName String
+  number     Int
+  posX       Int     // 0-100 (pour placement sur terrain vert)
+  posY       Int     // 0-100
+  isStarter  Boolean @default(true)
+  tacticalRole String? // AJOUTE CETTE LIGNE ICI
+}
+
+model MatchStats {
+  id            Int   @id @default(autoincrement())
+  matchId       Int   @unique
+  match         Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  homePossession Int  @default(50)
+  awayPossession Int  @default(50)
+  homeShots      Int  @default(0)
+  awayShots      Int  @default(0)
+  homeOnTarget   Int  @default(0)
+  awayOnTarget   Int  @default(0)
+  homeCorners    Int  @default(0)
+  awayCorners    Int  @default(0)
+}
+
+model Standing {
+  id            Int   @id @default(autoincrement())
+  played        Int   @default(0)
+  won           Int   @default(0)
+  drawn         Int   @default(0)
+  lost          Int   @default(0)
+  goalsFor      Int   @default(0)
+  goalsAgainst  Int   @default(0)
+  points        Int   @default(0)
+  ascId         Int
+  asc           Asc   @relation(fields: [ascId], references: [id])
+  zoneId        Int
+  zone          Zone  @relation(fields: [zoneId], references: [id])
+  @@unique([ascId, zoneId])
+}
+
+model MatchComment {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  matchId   Int
+  match     Match    @relation(fields: [matchId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+
+
+
+// ==========================================
+//  PROXIMITÉ & GÉOLOCALISATION (CTO EDITION)
+// ==========================================
+
+// Table pour la limite 12h (Anti-spam)
+model ProximityAlert {
+  id         Int      @id @default(autoincrement())
+  senderId   Int      // Celui qui est proche (déclencheur)
+  receiverId Int      // Celui qui reçoit l'alerte
+  createdAt  DateTime @default(now())
+  
+  // Relations
+  sender   User @relation("ProximitySender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ProximityReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@unique([senderId, receiverId]) // Une seule combinaison possible
+  @@index([receiverId, createdAt])  // Pour les requêtes rapides
+}
+
+model CareerStep {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  clubName    String   // Nom du club ou de l'académie
+  startYear   String   // Ex: "2022"
+  endYear     String   // Ex: "2024" ou "Présent"
+  role        String   // Poste (Joueur) ou Titre (Coach)
+  description String?  @db.Text // Détails et Palmarès
+  
+  mediaUrl    String?  // La photo du trophée ou de l'équipe
+  isCurrent   Boolean  @default(false) // Pour mettre en avant le club actuel
+
+  // Football
+  mj          String?  // Matchs joués
+  buts        String?  // Buts
+  pd          String?  // Passes décisives
+  note        String?  // Note moyenne
+  
+  // Basketball
+  pts         String?  // Points
+  reb         String?  // Rebonds
+  pad         String?  // Passes décisives
+  moyPts      String?  // Moyenne de points
+  
+  // Handball
+  buts_hand   String?  // Buts handball
+  passes      String?  // Passes handball
+  
+  // Volleyball
+  points      String?  // Points volleyball
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+
+// 2. Ajoute ce modèle à la fin de ton fichier prisma
+model Trophy {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title     String   // ex: "Champion de Zone"
+  year      String   // ex: "2023"
+  type      String   @default("medal") // "medal", "star", "trophy" pour choisir l'icône
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model CareerTeaserInteraction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // "DISMISS", "OPEN_DETAILS", "START_CV"
+  createdAt DateTime @default(now())
+}
+
+
+
+// 1. Pour définir le type de contenu dans un message
+enum MediaType {
+  TEXT
+  IMAGE
+  VIDEO
+  PDF
+  SHARED_POST
+  AUDIO //AJOUTE CETTE LIGNE 
+  SHARED_AUDIO
+  SHARED_ORG_POST // Ajoutez ceci
+  SHARED_STORY 
+}
+
+// 2. La "boîte" qui contient la discussion entre deux personnes
+model Conversation {
+  id            Int       @id @default(autoincrement())
+  user1Id       Int
+  user2Id       Int
+  // Relations avec les utilisateurs
+  user1         User      @relation("User1Conv", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2         User      @relation("User2Conv", fields: [user2Id], references: [id], onDelete: Cascade)
+  
+  messages      Message[]
+  // AJOUTE CETTE LIGNE :
+  chatTabs      ChatTab[] 
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt // Changera à chaque nouveau message
+
+  // AJOUTE CETTE LIGNE
+  isPinned      Boolean   @default(false)  // Pour l'utilisateur1
+  isPinnedForUser2 Boolean @default(false) // Pour l'utilisateur2
+
+  // AJOUTE CES DEUX LIGNES
+  isArchivedForUser1 Boolean @default(false)
+  isArchivedForUser2 Boolean @default(false)
+
+  // Empêche d'avoir deux conversations entre les deux mêmes personnes
+  @@unique([user1Id, user2Id])
+}
+
+// 3. Le message lui-même
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       Int
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  text           String?      @db.Text
+  mediaUrl       String?      // Pour S3 (Image, Vidéo, PDF)
+  mediaType      MediaType    @default(TEXT)
+  duration       Int?
+
+  sharedPostId   Int?
+  sharedPost     Post?        @relation(fields: [sharedPostId], references: [id], onDelete: SetNull)
+
+  sharedOrgPostId Int?    // Ajoutez ceci
+  sharedOrgPost   OrganizationPost? @relation("SharedOrgPosts", fields: [sharedOrgPostId], references: [id], onDelete: SetNull) //Ajoutez ceci
+
+  sharedAudioId  Int?
+  sharedAudio    StoryAudio?  @relation("SharedAudios", fields: [sharedAudioId], references: [id], onDelete: SetNull)
+  
+  isRead         Boolean      @default(false)
+  isPinned       Boolean      @default(false)
+  isArchived     Boolean      @default(false) // Pour cacher un message sans le supprimer
+  
+  createdAt      DateTime     @default(now())
+
+  // NOUVEAU : Contexte de la story partagée
+  sharedStoryId Int?
+  sharedStory   Story?  @relation("SharedStories", fields: [sharedStoryId], references: [id], onDelete: SetNull)
+  
+  //  NOUVEAU : Snapshot JSON des données de la story au moment du partage
+  // (permet d'afficher le texte même si la story est supprimée plus tard)
+  storySnapshot Json?
+
+
+  //AJOUTE CES 3 LIGNES :
+  replyToId      Int?         // ID du message auquel on répond
+  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]    @relation("MessageReplies")
+  
+  // Pour le signalement spam
+  reports        MessageReport[]
+  deletions      MessageDeletion[]
+  reactions    MessageReaction[]
+
+  isEdited       Boolean      @default(false)
+  isDeleted      Boolean      @default(false)
+}
+
+// 4. Pour les signalements
+model MessageReport {
+  id         Int      @id @default(autoincrement())
+  messageId  Int
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporterId Int
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     String
+  createdAt  DateTime @default(now())
+}
+
+
+// 4. Pour la suppression personnalisée (Supprimer pour moi)
+model MessageDeletion {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId]) // Empêche les doublons
+}
+
+
+
+
+// Types de réactions possibles
+enum ReactionType {
+  LIKE      
+  LOVE      
+  LAUGH     
+  SURPRISED 
+  SAD       
+  ANGRY     
+}
+
+// Table des réactions aux messages
+model MessageReaction {
+  id           Int          @id @default(autoincrement())
+  messageId    Int
+  userId       Int
+  reactionType ReactionType
+  createdAt    DateTime     @default(now())
+  
+  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([messageId, userId]) // Un utilisateur = une réaction par message
+  @@index([messageId])
+  @@index([userId])
+}
+
+
+
+
+
+
+// --- MODÈLE POUR LE TRAIN TODAY ---
+
+model TrainingSession {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  
+  videoUrl      String   // L'exploit filmé
+  description   String?
+  duration      Int?     // Durée de la séance en minutes
+  intensity     Int      @default(3) // 1 à 5
+  
+  isPublic      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  feedbacks     TrainingFeedback[]
+  targets       TrainingTarget[]
+  notifications Notification[]
+  reactions     TrainingReaction[]
+}
+
+model TrainingFeedback {
+  id              Int      @id @default(autoincrement())
+  sessionId       Int
+  session         TrainingSession @relation(fields: [sessionId], references: [id])
+  
+  reviewerId      Int
+  reviewer        User     @relation("ReviewerRelation", fields: [reviewerId], references: [id])
+  
+  technicalScore  Int      @default(0) // Note sur 5
+  intensityScore  Int      @default(0)
+  comment         String?
+  voiceNoteUrl    String?  // Optionnel : pour les coachs qui parlent
+  
+  createdAt       DateTime @default(now())
+}
+
+model TrainingTarget {
+  id              Int      @id @default(autoincrement())
+  sessionId       Int
+  session         TrainingSession @relation(fields: [sessionId], references: [id])
+  
+  targetUserId    Int
+  targetUser      User     @relation("TargetRelation", fields: [targetUserId], references: [id])
+}
+
+
+
+// ==========================================
+// SUIVI DES POSTS VUS (COMME INSTAGRAM)
+// ==========================================
+model UserPostView {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  action    String   // "VIEW", "LIKE", "SAVE", "SKIP", "WATCH_FULL"
+  seenAt    DateTime @default(now())
+  
+  // Relations (maintenant les champs opposés existent)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, postId])
+  @@index([userId, seenAt])
+  @@index([userId, action])
+}
+
+
+model TrainingReaction {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  emoji     String   // Stocke l'emoji
+  createdAt DateTime @default(now())
+
+  session   TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId]) // Un utilisateur = une seule réaction par vidéo
+}
+
+
+
+model CVPayment {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  refCommand    String   @unique
+  token         String?
+  amount        Int      @default(200)
+  status        String   @default("PENDING") // PENDING, SUCCESS, FAILED, CANCELLED
+  paymentMethod String?
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+
+
+
+// ==========================================
+// PROPULSE ADD (PUBLICITÉ INTERNE)
+// ==========================================
+
+model PropulseAd {
+  id          Int      @id @default(autoincrement())
+  title       String   // "Offre Premium 50"
+  description String?  @db.Text  // Description courte
+  mediaUrl    String?  // Image ou vidéo (CloudFront)
+  ctaText     String   // "J'en profite", "Découvrir", "S'inscrire"
+  ctaLink     String   // deep link: propulse://shop ou /premium
+  
+  // Ciblage
+  targetRole  String   @default("ALL")  // 'ALL', 'joueur', 'coach', 'manager'
+  targetSport String   @default("ALL")  // 'ALL', 'football', 'basketball'...
+  
+  // Priorité et dates
+  priority    Int      @default(5)      // 1 à 10 (1 = le plus visible)
+  startDate   DateTime @default(now())
+  endDate     DateTime
+  
+  // Statistiques
+  impressions Int      @default(0)      // Compteur de vues
+  clicks      Int      @default(0)      // Compteur de clics
+  
+  // Statut
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  impressionsLog PropulseAdImpression[]
+  clicksLog      PropulseAdClick[]
+  //NOUVEAU : Images multiples (max 10)
+  images      PropulseAdImage[]
+
+  @@index([isActive, startDate, endDate])
+  @@index([targetRole, targetSport])
+  @@index([priority])
+}
+
+//AJOUTE CE NOUVEAU MODÈLE ICI (après PropulseAd)
+model PropulseAdImage {
+  id        Int      @id @default(autoincrement())
+  adId      Int
+  url       String   // L'URL S3/CloudFront de l'image
+  order     Int      @default(0) // Pour l'ordre d'affichage (1,2,3...)
+  createdAt DateTime @default(now())
+
+  ad        PropulseAd @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId])
+  @@index([order])
+}
+
+
+
+//Log des impressions (pour éviter de compter plusieurs fois le même user)
+model PropulseAdImpression {
+  id        Int      @id @default(autoincrement())
+  adId      Int
+  userId    Int
+  viewedAt  DateTime @default(now())
+
+  ad        PropulseAd @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, userId])  // Un user ne compte qu'une impression par pub
+  @@index([adId, viewedAt])
+}
+
+//Log des clics
+model PropulseAdClick {
+  id        Int      @id @default(autoincrement())
+  adId      Int
+  userId    Int
+  clickedAt DateTime @default(now())
+
+  ad        PropulseAd @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, userId])  // Un user ne peut cliquer qu'une fois par pub
+  @@index([adId, clickedAt])
+}
+
+
+model CertificationPayment {
+  id            Int        @id @default(autoincrement())
+  userId        Int
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refCommand    String     @unique // Référence de commande unique
+  token         String?    // Jeton Paytech ou reçu de transaction Apple
+  amount        Int
+  status        String     @default("PENDING") // PENDING, SUCCESS, FAILED, CANCELLED
+  paymentMethod String?    // "WAVE", "ORANGE_MONEY", "APPLE_IAP"
+  tier          CertifTier //Le palier acheté
+  paidAt        DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+// NOUVELLE TABLE DÉDIÉE : SESSIONS & MÉTADONNÉES DE CONNEXION
+model UserSession {
+  id              Int      @id @default(autoincrement())
+  userId          Int      
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées réseau
+  connectionType  String?  // "WIFI", "CELLULAR", "NONE"
+  
+  // Métadonnées appareil
+  deviceBrand     String?  // "Apple", "Samsung"
+  deviceModel     String?  // "iPhone 13"
+  deviceOS        String?  // "iOS", "Android"
+  deviceOSVersion String?  // "17.4"
+  
+  // Géolocalisation
+  latitude        Float?
+  longitude       Float?
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+
+// ==========================================
+//  LIBRAIRIE DYNAMIQUE DE STICKERS (ADMIN)
+// ==========================================
+model Sticker {
+  id          Int      @id @default(autoincrement())
+  type        String   // "emoji", "text", "lottie", "image"
+  content     String   // Le texte (GOAL !), l'emoji , ou l'URL S3/CDN (https://...)
+  keywords    String   // Mots-clés pour la recherche (ex: "ballon foot but")
+  category    String   // Catégorie (ex: "foot", "basket", "general", "motivation", "victoire")
+  
+  // Style optionnel (principalement pour le type "text")
+  bgColor     String?  // Code hexadécimal 
+  textColor   String?  // Code hexadécimal 
+  borderWidth Float?
+  borderColor String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([category])
+}
+
+
+
+model StorySlider {
+  id         Int               @id @default(autoincrement())
+  storyId    Int               @unique
+  story      Story             @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  emoji      String
+  question   String
+  x          Float             @default(0)
+  y          Float             @default(0)
+  scale      Float             @default(1)
+  rotation   Float             @default(0)
+  createdAt  DateTime          @default(now())
+  votes      StorySliderVote[]
+}
+
+model StorySliderVote {
+  id        Int         @id @default(autoincrement())
+  sliderId  Int
+  slider    StorySlider @relation(fields: [sliderId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  value     Float       // Valeur du vote (ex: de 0 à 100)
+  createdAt DateTime    @default(now())
+
+  @@unique([sliderId, userId]) // Empêche un utilisateur de voter plusieurs fois
+}
+
+
+// Modèle pour les Onglets/Dossiers personnalisés (Style WhatsApp)
+model ChatTab {
+  id            Int            @id @default(autoincrement())
+  name          String         // Nom de l'onglet (ex: "Travail", "Famille")
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Les conversations contenues dans cet onglet
+  conversations Conversation[] 
+
+  createdAt     DateTime       @default(now())
+
+  @@index([userId])
+}
+
+
+model StoryAudio {
+  id          Int      @id @default(autoincrement())
+  title       String   // Titre donne par l utilisateur
+  audioUrl    String   // URL S3/CloudFront du fichier
+  duration    Int?     // Duree en secondes (pour l affichage 0:12)
+  waveform    String?  // JSON des niveaux sonores
+
+  authorId    Int
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  usageCount  Int      @default(0) // Nombre de stories qui l utilisent
+  isPublic    Boolean  @default(true) // Pour les sons publics ou prives
+
+  createdAt   DateTime @default(now())
+  sharedMessages Message[] @relation("SharedAudios")
+  stories     Story[]  // Toutes les stories qui utilisent ce son
+  posts       Post[]   // AJOUTE CETTE LIGNE
+  likesCount  Int              @default(0)
+  likes       StoryAudioLike[]
+  isOfficial  Boolean  @default(false) // Permet d identifier les sons ProPulse
+}
+
+
+// --- LIKES SUR LA BIBLIOTHÈQUE AUDIO ---
+model StoryAudioLike {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storyAudioId Int
+  storyAudio   StoryAudio @relation(fields: [storyAudioId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, storyAudioId]) // Empêche de liker deux fois le même son
+}
+
+
+
+// ==========================================
+// STRUCTURE TOURNOIS (eSPORT HUB)
+// ==========================================
+
+model Tournament {
+  id              Int          @id @default(autoincrement())
+  title           String       // Nom du tournoi (ex: "Champions ProPulse Sénégal")
+  description     String?      @db.Text
+  
+  // Jeu sélectionné
+  game            String       // "eFootball", "FC_MOBILE", "FREE_FIRE", "COD_MOBILE", "PUBG_MOBILE"
+  
+  // Règles posées librement par le créateur
+  rules           String       @db.Text
+  
+  prizePool       String?      // Cash prize ou récompenses (ex: "50 000 FCFA", "Médaille")
+  maxParticipants Int          @default(16)
+  
+  isFree          Boolean      @default(true)
+  entryFee        Float?       @default(0) // Frais d'inscription si payant
+  
+  // Système de modération / États
+  status          String       @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, REJECTED, ACTIVE, FINISHED
+  rejectionReason String?      @db.Text
+
+  // Le créateur (Manager, Coach ou Admin - PAS JOUEUR)
+  creatorId       Int
+  creator         User         @relation("TournamentCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  // Les joueurs inscrits
+  participants    TournamentParticipant[]
+  matches         TournamentMatch[]
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+ 
+  // Ajoute ou vérifie cette ligne
+  liveStream      LiveStream? @relation("TournamentLive") 
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model TournamentParticipant {
+  id            Int        @id @default(autoincrement())
+  tournamentId  Int
+  tournament    Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  
+  userId        Int
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status        String     @default("PENDING") // PENDING (en attente), ACCEPTED (validé), DECLINED (refusé)
+  createdAt     DateTime   @default(now())
+
+  @@unique([tournamentId, userId]) // Empêche un joueur de s'inscrire deux fois
+}
+
+
+model TournamentMatch {
+  id            Int              @id @default(autoincrement())
+  tournamentId  Int
+  tournament    Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  round         Int              // 0 = premier tour, 1 = suivant, etc.
+  position      Int              // position dans le round (sert à reconstituer l'arbre)
+
+  playerAId     Int?
+  playerA       User?            @relation("TournamentMatchPlayerA", fields: [playerAId], references: [id])
+  playerBId     Int?
+  playerB       User?            @relation("TournamentMatchPlayerB", fields: [playerBId], references: [id])
+
+
+  youtubeVideoId String?
+
+  scoreA        Int?
+  scoreB        Int?
+
+  winnerId      Int?
+  winner        User?            @relation("TournamentMatchWinner", fields: [winnerId], references: [id])
+
+  scheduledAt   DateTime?
+  status        String           @default("PENDING") // PENDING, SCHEDULED, LIVE, DONE
+
+  // Lien vers le match du round suivant où le vainqueur avancera
+  nextMatchId     Int?
+  nextMatch       TournamentMatch?  @relation("TournamentMatchProgression", fields: [nextMatchId], references: [id])
+  previousMatches TournamentMatch[] @relation("TournamentMatchProgression")
+  comments TournamentMatchComment[]
+
+  liveStream    LiveStream?      @relation("MatchLive")
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([tournamentId, round, position])
+}
+
+
+// ==========================================
+// SYSTÈME DE LIVE STREAMING (eSPORT)
+// ==========================================
+
+model LiveStream {
+  id              Int      @id @default(autoincrement())
+  title           String
+  ingestEndpoint  String
+  streamKey       String
+  playbackUrl     String
+  isLive          Boolean  @default(false)
+  viewerCount     Int      @default(0)
+  
+  // LIEN VERS LE MATCH (Corrigé)
+  matchId         Int?     @unique
+  match           TournamentMatch? @relation("MatchLive", fields: [matchId], references: [id], onDelete: Cascade)
+
+  // LIEN VERS LE TOURNOI (Corrigé - si tu veux un live global au tournoi)
+  tournamentId    Int?     @unique
+  tournament      Tournament?      @relation("TournamentLive", fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  streamerId      Int
+  streamer        User     @relation(fields: [streamerId], references: [id])
+
+  replayUrl       String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
+model TournamentMatchComment {
+  id        Int             @id @default(autoincrement())
+  matchId   Int
+  match     TournamentMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User            @relation("TournamentMatchCommentAuthor", fields: [userId], references: [id])
+  text      String
+  createdAt DateTime        @default(now())
+}
+
+
+
+// --- NOUVEAU MODÈLE POUR LES ORGANISATEURS DE TOURNOIS ---
+
+model Organization {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+
+  logo        String?
+  banner      String?
+
+  sportCategory String?  // "football", "basketball", "volleyball", "handball", "autre"
+
+  // Contact
+  email       String?
+  phone       String?
+  address     String?
+  country     String?
+
+  // Détails
+  objectives  String?  @db.Text
+  rules       String?  @db.Text
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String? @db.Text
+
+  members     User[]   @relation("OrganizationMembers")
+
+  requests    OrganizationRequest[]
+  invitations OrganizationInvitation[]
+
+   posts              OrganizationPost[]
+  followers          OrganizationFollow[]
+
+  mutedBy MutedOrganization[]
+
+  website     String?
+  facebook    String?
+  instagram   String?
+  twitter     String?
+  youtube     String?
+  tiktok      String?
+
+  privacy     String   @default("PUBLIC") // PUBLIC, COMMUNITY, PRIVATE
+
+  ownerId     Int
+
+  owner       User     @relation("OwnedOrganizations", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  tournaments Tournament[]
+  notifications Notification[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reports     Report[]
+}
+
+
+// Demandes : Joueur -> Organisation (Le joueur veut entrer)
+model OrganizationRequest {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  userId         Int
+  status         String       @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  createdAt      DateTime     @default(now())
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+// Invitations : Organisation -> Joueur (L'organisation veut le joueur)
+model OrganizationInvitation {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  userId         Int
+  status         String       @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+
+// --- HUB ORGANISATIONS : POSTS & INTERACTIONS AJUE---
+
+model OrganizationPost {
+  id             Int      @id @default(autoincrement())
+  text           String?  @db.Text
+  mediaUrl       String?
+  thumbnailUrl   String?  // AJOUTE CETTE LIGNE ICI
+  mediaType      String?  // "image", "video", "gif"
+  audience       String   @default("everyone") // everyone, followers, mentioned
+  views          Int      @default(0) // AJOUTE CETTE LIGNE
+  
+  // Relations
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  authorId       Int
+  author         User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  likes          OrganizationPostLike[]
+  comments       OrganizationPostComment[]
+
+  savedBy        SavedOrganizationPost[]
+  hiddenBy       HiddenOrganizationPost[]
+
+  votes OrganizationPostVote[]
+
+  reports        Report[]
+
+   notifications  Notification[]
+   reactions OrganizationPostReaction[]
+  sharedMessages Message[] @relation("SharedOrgPosts") // Ajoutez ceci 
+  
+  // Sondage (Stocké en JSON pour la simplicité ou via une table)
+  pollOptions    Json?    // ["Option A", "Option B"]
+   pollEndsAt     DateTime?   //AJOUTE CETTE LIGNE
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model OrganizationPostLike {
+  id        Int              @id @default(autoincrement())
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model OrganizationPostComment {
+  id        Int              @id @default(autoincrement())
+  text      String           @db.Text
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  // AJOUT POUR LES RÉPONSES (HIÉRARCHIE)
+  parentId  Int?
+  parent    OrganizationPostComment?  @relation("OrgCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   OrganizationPostComment[] @relation("OrgCommentReplies")
+
+  // AJOUT POUR LES LIKES DE COMMENTAIRES
+  likes     OrganizationCommentLike[]
+}
+
+// Table pour suivre les organisations
+model OrganizationFollow {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+model OrganizationCommentLike {
+  id        Int                     @id @default(autoincrement())
+  commentId Int
+  comment   OrganizationPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime                @default(now())
+
+  @@unique([commentId, userId])
+}
+
+model OrganizationPostReaction {
+  id        Int      @id @default(autoincrement())
+  emoji     String   // Stocke l'emoji
+  
+  // Relations
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  //TRÈS IMPORTANT : Empêche un utilisateur d'avoir 2 réactions sur le même post
+  // C'est ce qui permet au "upsert" de fonctionner
+  @@unique([postId, userId])
+}
+
+
+//Pour enregistrer les posts du Hub
+model SavedOrganizationPost {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, postId])
+}
+
+// Pour masquer les posts du Hub
+model HiddenOrganizationPost {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, postId])
+}
+
+
+
+model MutedOrganization {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  organizationId Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+
+model OrganizationPostVote {
+  id        Int              @id @default(autoincrement())
+  postId    Int
+  post      OrganizationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  option    Int              // L index de l option choisie (0 ou 1)
+  createdAt DateTime         @default(now())
+
+  @@unique([postId, userId]) // Un vote par personne
+}
+
+// --- AJOUTER LES RELATIONS DANS LES MODÈLES EXISTANTS ---
+
+
+
+model ManagerCertification {
+  id              Int          @id @default(autoincrement())
+  userId          Int          @unique
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Infos du dossier (Auto-remplissage)
+  fullName        String?
+  phoneNumber     String?
+  clubName        String?
+  cityRegion      String?
+  position        String?
+  email           String?
+
+  tier            CertifTier   @default(PREMIUM)
+  status          CertifStatus @default(INCOMPLETE)
+  
+  // Paiement
+  paymentStatus   Boolean      @default(false)
+  transactionId   String?      @unique
+  paymentMethod   String?      // "PAYTECH", "WAVE", etc.
+  amount          Int?
+  
+  // Dates de validité (Abonnement Annuel)
+  expiryDate      DateTime?    
+  lastReminderSent DateTime?   // Pour ne pas envoyer l'alerte 10j plusieurs fois
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+
+model Stadium {
+  id          Int      @id @default(autoincrement())
+  osmId       String?  @unique
+  name        String
+  address     String?
+  city        String?
+  country     String?
+  latitude    Float
+  longitude   Float
+  sport       String   @default("football")
+  imageUrl    String?
+  wikipedia   String?
+  operator    String?
+  capacity    String?
+  surface     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+
+
+// ==========================================
+// MESSAGES DE CONTACT (Formulaire /contact)
+// ==========================================
+model ContactMessage {
+  id          Int      @id @default(autoincrement())
+  
+  // Type de sujet : support, partner, press, jobs
+  type        String   @default("support")
+  
+  // Expéditeur (peut être un user inscrit OU un visiteur anonyme)
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  fullName    String
+  email       String
+  phone       String?  // Optionnel
+  
+  subject     String?  // Rempli dynamiquement selon le type (company, media, role...)
+  message     String   @db.Text
+  
+  // Gestion côté admin
+  status      String   @default("NEW") // NEW, READ, REPLIED, ARCHIVED
+  adminReply  String?  @db.Text
+  repliedAt   DateTime?
+  
+  // Métadonnées utiles
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([type])
+}
+
+model BlogPost {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique       // url-friendly (ex: "propulse-v2")
+  title       String
+  subtitle    String?  @db.Text
+  content     String   @db.Text       // markdown ou HTML
+  coverImage  String?
+  tag         String   @default("Actualité")
+  readTime    Int      @default(5)
+  authorName  String
+  authorRole  String?
+  authorBio   String?  @db.Text
+  authorAvatar String?
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, publishedAt(sort: Desc)])
+}
+
+
+// ==========================================
+// ACHATS DE KUDOS (Paiement via PayTech)
+// ==========================================
+model KudosPurchase {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  packId        String   // "pack_10", "pack_30", etc.
+  kudosAmount   Int      // Combien de Kudos seront crédités
+  amountXof     Int      // Prix en FCFA
+  
+  refCommand    String   @unique // Référence unique PayTech (anti-doublon IPN)
+  token         String?  // Jeton PayTech (retour API)
+  status        String   @default("PENDING") // PENDING, SUCCESS, FAILED, CANCELLED
+  paymentMethod String?  // "WAVE", "ORANGE_MONEY", "CARD"
+  paidAt        DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ==========================================
+// CONVERSIONS KUDOS verts ARGENT
+// ==========================================
+model KudosConversion {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Montants de base
+  kudosConverted  Int      // Nombre de Kudos convertis (ex: 1500)
+  amountFcfaBrut  Int      // Valeur brute en FCFA (ex: 30000)
+  commissionPct   Int      @default(50)  // Commission ProPulse en % (ex: 50)
+  commissionFcfa  Int      // Part ProPulse (ex: 15000)
+  amountNetFcfa   Int      // Part créateur (ex: 15000)
+  
+  // Devise de sortie
+  currency        String   // "XOF", "EUR", "USD"
+  amountNetLocal  Float    // Montant dans la devise choisie (ex: 26.0)
+  exchangeRate    Float    // Taux appliqué (ex: 577.0 pour USD)
+  
+  // Paiement
+  paymentMethod   String?  // "WAVE", "ORANGE_MONEY", "BANK", "PAYPAL"
+  paymentDetails  String?  // JSON stringifié (numéro, IBAN, email PayPal)
+  
+  // Statut
+  status          String   @default("PENDING")  // PENDING, PROCESSING, PAID, FAILED, CANCELLED
+  refCommand      String   @unique              // Référence unique (anti-doublon)
+  
+  // Admin
+  adminNote       String?  // Motif si FAILED/CANCELLED, ou note interne
+  processedAt     DateTime?
+  paidAt          DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
+  @@index([createdAt])
+}

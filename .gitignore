@@ -1,0 +1,12 @@
+.DS_Store
+**/node_modules/
+**/.env
+**/uploads/
+**/generated/
+*.log
+
+note.txt
+note1
+Ajuatement.txt
+*.backup*
+index.js.backup*

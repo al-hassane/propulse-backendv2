@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+.git
+uploads
+*.md
+.DS_Store
+index.js
+seed*.js
+seed-data
+fix-*.js
+clean-*.js
+migrate_cloudinary.js
