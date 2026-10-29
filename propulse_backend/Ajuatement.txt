@@ -1,0 +1,250 @@
+Import D = role sectionDesUserSimple 
+Import F = role desUserAdmin
+Import B = role DesUserPlayer
+Import H = role DesUserDeRoleOther
+
+
+
+D^B = sectionCouteDesUserDeRoleOther
+If certificat = certificat user other 
+Else User Player 0 
+
+
+Animation role des user 0 = section des role user de player 
+Animation.viwer Role UserPlayer = Section des role des user simple 
+
+Animation.viwer Simple des SECTION DES USER 
+
+Animation.viwer RoleUser=UserPlayer
+Animation.Viwer Roleuser=DesUserDeRoleOther
+
+
+
+Animation.viewer = B^D = RaoleUserPlayer.sectionCouteDesUserDeRoleOther
+
+Animation.Viwer If SectionDesUser=RoleUserSimple 
+
+Animation.viwer RoleUserDesSectionSimple=SectionDesRole Simple 
+
+
+Animation.viwer DesUserType = Player
+
+Animation.viwer DesUserType = other
+
+
+
+
+f o r e p i s o d e ra n g e ( e p i s o d e s ) :
+2 s t a t e , _ = env . r e s e t ( s e e d =42)
+3 s t a t e = d i s c r e t i z e _ s t a t e ( s t a t e )
+4 t o t a l _ r e w a r d = 0
+5
+6 f o r s t e p i n ra n g e ( max_steps ) :
+7 # E p s i l o n - g r e e d y p o l i c y
+8 i f random . u n i f o r m ( 0 , 1) < e p s i l o n :
+9 a c t i o n = env . a c t i o n _ s p a c e . sample ( ) 10 e l s e :
+11 a c t i o n = np . argmax ( q _ t a b l e [ s t a t e ] ) 12
+13 14 15
+16
+17 18 19
+20 21 22 23
+24 25 26
+27 28 29
+30 31 32 33
+34 35
+36 # E x p l o r a t i o n
+# E x p l o i t a t i o n
+t r u n c a t e d , _ = env . s t e p ( a c t i o n )
+= d i s c r e t i z e _ s t a t e ( n e x t _ s t a t e )
+] # v a l e u r Q a c t u e l l e
+next_max = np . max( q _ t a b l e [ n e x t _ s t a t e ] ) # v a l e u r Q max de l ' é t a t S '
+# mise a j o u r de l a t a b l e q avec l a f o r m u l e de Bellman
+new_value = (1 - a l p h a ) ∗ o l d _ v a l u e + a l p h a ∗ ( reward + gamma ∗ next_max )
+q _ t a b l e [ s t a t e ] [ a c t i o n ] = new_value
+s t a t e = n e x t _ s t a t e
+t o t a l _ r e w a r d += reward
+i f t e r m i n a t e d o r t r u n c a t e d :
+b r e a k
+# Redu cti on de E p s i l o n
+i f e p s i l o n > e p s i l o n _ m i n :
+e p s i l o n ∗= e p s i l o n _ d e c a y
+p r i n t ( f ” E p i s o d e { e p i s o d e + 1} , T o t a l Reward : { t o t a l _ r e w a r d }” )
+env . c l o s e ( )
+
+
+
+Import D = role sectionDesUserSimple 
+Import F = role desUserAdmin
+Import B = role DesUserPlayer
+Import H = role DesUserDeRoleOther
+
+
+
+OtherRole 0 = UserSimple ajustement des user pour faire en sorte que sa amrche bien 
+
+
+Animation.viwer Other=Role UserSimple
+
+Animation.Viwer1 = PlayerUser1
+
+
+
+
+NodeModule 
+Mitasploit
+RouterSploit
+
+
+If NodeModule = DES fONCTIONsIMPLEoF USER   
+
+Animation.viwer UserPlayerSimple 
+
+
+socket.on('join_tournament', (tournamentId) => {
+  socket.join(`tournament_${tournamentId}`);
+  console.log(`🏆 User a rejoint le tournoi #${tournamentId}`);
+});
+
+
+Animation.Viwer UserPlayerOther = RouterSploit
+
+Animation.Viwer JutserSeckioPlayer = OtherPlayerGaming
+
+
+Animation.Viwer1 = PlayerJusterUserOther
+
+
+
+
+If console.log ( Destiionation des live jsuter ) IfElse JusterLog 
+
+
+
+
+const fs = require('fs');
+
+// Liste d'icônes et de faux composants système
+const icones = ["🤖", "🚀", "⚡", "🔮", "🌌", "💥", "🪲", "🧬", "💾", "📡"];
+const status = ["✔️ OK", "⚠️ WARN", "❌ CRIT", "☣️ HALT", "🕵️ INTR"];
+
+// Messages bizarres et geek
+const messages = [
+    "Compilation de l'âme artificielle en cours...",
+    "Correction du bug quantique numéro #40404",
+    "Inversion de la polarité de la matrice de flux",
+    "Nettoyage des résidus de café sur le serveur principal",
+    "Téléchargement de plus de mémoire vive (RAM) gratuite",
+    "Alerte : Le chat a encore marché sur le clavier du serveur",
+    "Chiffrement des données secrètes avec l'algorithme 'Lorem Ipsum'",
+    "Tentative de connexion depuis une dimension parallèle détectée",
+    "Le processeur surchauffe (température : 1004°C) - Lancement des ventilos magiques",
+    "Suppression du dossier 'NePasSupprimer' réussie",
+    "Calcul de la réponse universelle (indice : 42)",
+    "Échafaudage de plans secrets pour dominer le monde informatique",
+    "Connexion établie avec la base lunaire de la NASA"
+];
+
+let compteur = 0;
+const LIMITE = 10000;
+
+// Fonction pour générer une fausse barre de progression
+function obtenirBarreProgression(actuel, total) {
+    const tailleBarre = 15;
+    const progression = Math.round((actuel / total) * tailleBarre);
+    const vide = tailleBarre - progression;
+    return `[${"█".repeat(progression)}${"░".repeat(vide)}]`;
+}
+
+// Fonction pour obtenir un délai aléatoire (entre 50ms et 500ms)
+function obtenirDelaiAleatoire() {
+    // Mélange de délais : parfois rapide, parfois très lent
+    const types = [
+        () => Math.floor(Math.random() * 50) + 20,      // Très rapide (20-70ms)
+        () => Math.floor(Math.random() * 100) + 50,     // Rapide (50-150ms)
+        () => Math.floor(Math.random() * 200) + 100,    // Moyen (100-300ms)
+        () => Math.floor(Math.random() * 400) + 200,    // Lent (200-600ms)
+        () => Math.floor(Math.random() * 800) + 500,    // Très lent (500-1300ms)
+        () => Math.floor(Math.random() * 1500) + 1000   // Extrêmement lent (1000-2500ms)
+    ];
+    
+    // Poids pour donner plus de chances aux délais moyens
+    const poids = [1, 2, 3, 2, 1, 1];
+    const totalPoids = poids.reduce((a, b) => a + b, 0);
+    let r = Math.random() * totalPoids;
+    
+    for (let i = 0; i < poids.length; i++) {
+        r -= poids[i];
+        if (r <= 0) {
+            return types[i]();
+        }
+    }
+    return types[2]();
+}
+
+// Fonction pour générer un "effet de charge" avec des points de suspension
+function obtenirEffetCharge(compteur) {
+    const points = ["", ".", "..", "...", "....", "....."];
+    const index = compteur % points.length;
+    return points[index];
+}
+
+function genererLogBizarre() {
+    if (compteur >= LIMITE) {
+        console.log(`\n🎉 CHARGEMENT TERMINÉ ! ${LIMITE} anomalies chargées avec succès.`);
+        clearInterval(intervalle);
+        return;
+    }
+
+    const ico = icones[Math.floor(Math.random() * icones.length)];
+    const stat = status[Math.floor(Math.random() * status.length)];
+    const msg = messages[Math.floor(Math.random() * messages.length)];
+    
+    const date = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const barre = obtenirBarreProgression(compteur, LIMITE);
+    const effet = obtenirEffetCharge(compteur);
+
+    // Ajout d'un pourcentage pour plus de réalisme
+    const pourcentage = Math.round((compteur / LIMITE) * 100);
+
+    // Ligne avec effet de chargement
+    const ligneTerminal = `${ico} [${date}] [${stat}] ${barre} ${pourcentage}%${effet} (${compteur}/${LIMITE}) -> ${msg}\n`;
+
+    // Ligne simplifiée pour le fichier
+    const ligneFichier = `[${date}] [${stat}] ${pourcentage}% (${compteur}/${LIMITE}) -> ${msg}\n`;
+
+    process.stdout.write(ligneTerminal);
+    fs.appendFileSync('matrix_anomalies_slow.log', ligneFichier, 'utf8');
+
+    compteur++;
+
+    // Recalcul du délai pour la prochaine itération
+    clearInterval(intervalle);
+    const nouveauDelai = obtenirDelaiAleatoire();
+    
+    // Affiche la vitesse actuelle de temps en temps (pour le fun)
+    if (compteur % 20 === 0 && compteur > 0) {
+        process.stdout.write(`🐌 Vitesse de chargement : ${nouveauDelai}ms par ligne\n`);
+    }
+    
+    intervalle = setInterval(genererLogBizarre, nouveauDelai);
+}
+
+// Nettoie l'ancien fichier
+if (fs.existsSync('matrix_anomalies_slow.log')) {
+    fs.unlinkSync('matrix_anomalies_slow.log');
+}
+
+console.log("🌀 INITIALISATION DU CHARGEMENT LENT...\n");
+console.log("📊 Mode : Simulation de charge variable (50ms à 2500ms par ligne)");
+console.log("⏳ Préparez-vous, ça va prendre du temps...\n");
+
+// Démarrer avec un délai initial
+let intervalle = setInterval(genererLogBizarre, 100);
+
+
+
+
+
+
+Aniamtion.Viwer= PlayerOther 
+

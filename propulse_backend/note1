@@ -1,0 +1,108 @@
+Bonne nouvelle et mauvaise nouvelle. La mauvaise d'abord : `ffmpeg-kit-react-native` est **officiellement mort**. Ses mainteneurs ont annoncé sa retraite le 6 janvier 2025, et tous les binaires ont été retirés de Maven Central, CocoaPods et npm au 1er avril 2025 — donc si un tuto ou une IA te suggère cette lib aujourd'hui, ton build cassera au premier `pod install`/`gradle sync`. Je te le signale maintenant parce que c'était justement la pièce que j'avais mise en attente dans ma proposition précédente.
+
+### La bonne nouvelle : ce que tu vises est faisable
+
+Ce que montre ta capture (canvas + timeline avec clips + bande audio + barre d'outils Adjustments/Filter/Effect/Blur/Volume) est exactement le pattern **Skia + Reanimated + Gesture Handler** que je proposais. Voici le plan complet, phase par phase.
+
+### Phase 0 — Choix de l'outil d'export (remplace ffmpeg-kit)
+
+Trois options viables en 2026 :
+
+1. **`react-native-video-processing`** — wrapper natif léger (trim, compress, watermark), pas de binaire FFmpeg complet. Suffisant si tu ne fais que trim + overlay simple. Mais le paquet est peu maintenu.
+2. **Export server-side** — tu uploades les clips bruts + métadonnées de montage (timestamps, textes, stickers) vers ton backend, et c'est **ton serveur** (avec un vrai FFmpeg installé, pas de contrainte mobile) qui compose la vidéo finale. C'est ce que je recommande le plus pour toi : tu as déjà un backend Node/Prisma solide, l'upload différé, et ça t'évite tous les problèmes de binaires natifs mobiles.
+3. **Compilation FFmpeg maison** (`ffmpeg-kit` cloné et rebuild toi-même) — possible mais lourd à maintenir dans le temps (cf. les tutos de contournement que j'ai trouvés), à éviter sauf nécessité absolue de rendu 100% on-device.
+
+Vu ton architecture actuelle (upload FormData vers `/messages`, `/posts` etc.), l'option 2 (export côté serveur) s'intègre le plus naturellement : le mobile ne fait que le **preview temps réel** (léger, avec Skia) et envoie une "recette" JSON au serveur qui fait le rendu final lourd.
+
+### Phase 1 — Structure de l'écran (calque canvas + timeline)
+
+```
+StoryEditor.tsx
+├── EditorCanvas.tsx        // zone de preview (vidéo + overlays Skia)
+├── BottomToolbar.tsx        // Adjustments / Filter / Effect / Blur / Volume
+├── Timeline/
+│   ├── ClipStrip.tsx        // bande de miniatures vidéo (comme ta capture)
+│   ├── AudioTrack.tsx       // waveform en dessous
+│   └── PlayheadCursor.tsx   // ligne verticale de lecture
+└── TrimScrubber.tsx          // déjà construit au tour précédent
+```
+
+### Phase 2 — La barre d'outils du bas (le plus visible sur ta capture)
+
+C'est la pièce la plus simple à construire en premier — un système d'onglets qui change le panneau affiché juste au-dessus :
+
+```tsx
+// components/story-editor/BottomToolbar.tsx
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+const TOOLS = [
+  { key: "adjustments", icon: "options-outline", label: "Adjustments" },
+  { key: "filter", icon: "color-filter-outline", label: "Filter" },
+  { key: "effect", icon: "flash-outline", label: "Effect" },
+  { key: "blur", icon: "aperture-outline", label: "Blur" },
+  { key: "volume", icon: "volume-high-outline", label: "Volume" },
+] as const;
+
+interface BottomToolbarProps {
+  activeTool: string | null;
+  onSelectTool: (key: string) => void;
+}
+
+export default function BottomToolbar({ activeTool, onSelectTool }: BottomToolbarProps) {
+  return (
+    <View style={styles.row}>
+      {TOOLS.map((tool) => {
+        const isActive = activeTool === tool.key;
+        return (
+          <TouchableOpacity
+            key={tool.key}
+            style={styles.item}
+            onPress={() => onSelectTool(tool.key)}
+          >
+            <Ionicons
+              name={tool.icon as any}
+              size={22}
+              color={isActive ? "#00c6ff" : "#fff"}
+            />
+            <Text style={[styles.label, isActive && { color: "#00c6ff" }]}>
+              {tool.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 12,
+    backgroundColor: "#000",
+  },
+  item: { alignItems: "center", gap: 4 },
+  label: { fontSize: 10, color: "#fff", fontWeight: "600" },
+});
+```
+
+### Phase 3 — Le canvas de preview
+
+Là, tu as deux options selon ce que tu veux vraiment :
+- **Version simple** : `expo-av`/`react-native-video` + overlays React Native positionnés par-dessus (comme tu fais déjà pour tes stickers dans `CreateStoryScreen.tsx` avec `DraggableSticker`).
+- **Version avancée (rendu Skia)** : composer vidéo + texte + filtres en un seul canvas GPU avec `@shopify/react-native-skia` — nécessaire seulement si tu veux appliquer de vrais filtres pixel (comme "Filter"/"Blur" sur ta capture) en temps réel.
+
+Vu que tu as déjà un système de stickers/texte overlay qui fonctionne bien, je recommande de **garder cette approche pour le texte/stickers**, et de n'utiliser Skia que pour les filtres couleur et le flou (qui, eux, nécessitent vraiment un traitement pixel).
+
+### Ma recommandation d'ordre de développement
+
+1. **`TrimScrubber`** — déjà fait.
+2. **`ClipStrip`** (bande de miniatures vidéo avec `expo-video-thumbnails`) — pièce manquante immédiate.
+3. **`BottomToolbar`** — ci-dessus, rapide à intégrer.
+4. **Panneaux simples** (Adjustments = sliders basiques ; Volume = slider) — faciles, réutilisent des composants standards.
+5. **Filter/Blur avec Skia** — le plus complexe, à faire en dernier.
+6. **Export côté serveur** — en parallèle, dès que tu as une "recette" JSON stable (liste de clips + trims + overlays + audio).
+
+Veux-tu que je construise en premier le `ClipStrip` (extraction de miniatures + bande scrollable façon ta capture), ou préfères-tu qu'on démarre par la structure JSON de la "recette de montage" qui sera envoyée au serveur pour l'export final ?

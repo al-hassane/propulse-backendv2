@@ -1,0 +1,1136 @@
+
+**Exactement !** Tu as parfaitement compris. ✅
+
+
+
+## Voici le résumé de ton workflow :
+
+
+
+### 🍎 Pour travailler sur iOS (tester, développer)
+
+```bash
+
+git checkout 3666651
+
+npm install --legacy-peer-deps
+
+npx expo run:ios
+
+```
+
+eas submit --platform ios --latest 
+
+
+
+### 🤖 Pour build Android (version 16KB)
+
+```bash
+
+git checkout upgrade-rn-0.77
+
+git stash pop  # si tu avais stashé des modifications
+
+cd android && ./gradlew bundleRelease
+
+```
+
+
+cd android                       
+./gradlew clean
+./gradlew assembleRelease
+./gradlew bundleRelease
+
+
+cd ajustement color textBackground
+
+
+textColor
+textColorBackground
+dividerColor
+accentColor
+handleColor
+
+
+
+TextColorBackground = sectionCodePingGoogle
+private const val FREQ_COUNT_SUFFIX = "_count"
+
+
+### 📦 Pour synchroniser les modifications de code (pages, composants)
+
+```bash
+
+# Depuis la branche upgrade-rn-0.77
+
+git checkout upgrade-rn-0.77
+
+git checkout 3666651 -- app/  # récupère les dossiers app/ (pages, components, etc.)
+
+```
+
+
+
+### 🔧 Pour synchroniser les configs iOS uniquement
+
+```bash
+
+git checkout 3666651 -- ios/ Podfile package.json
+
+```
+
+
+
+## Important :
+
+
+
+| Ce qui change | Ce qui reste |
+
+|---------------|--------------|
+
+| Les pages, composants, logique | ✅ Inchangé entre branches |
+
+| Config iOS | ✅ iOS fonctionnel |
+
+| Config Android 16KB | ✅ Conservé |
+
+
+
+**Tu peux maintenant développer normalement sur iOS et build Android sans souci.** 🚀
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Excellent ! Ces concepts sont au **cœur des architectures ultra-performantes** comme TikTok, Instagram, Netflix.  
+Je vais te les expliquer simplement, en lien direct avec **Propulse Sport** et ton stack actuel.
+
+---
+
+## 1. CDN (CloudFront, Akamai, etc.)
+
+**C’est quoi ?**  
+Un CDN est un réseau de serveurs répartis dans le monde. Au lieu que tous les utilisateurs appellent ton serveur unique (ex: chez Hetzner, Render), ils appellent le serveur CDN le plus proche d’eux.
+
+**Pourquoi c’est puissant ?**  
+- Chargement des vidéos ultra-rapide  
+- Ton serveur principal ne sert presque plus de vidéos  
+- Réduction de la bande passante et des coûts serveur  
+
+**Exemple pour Propulse :**  
+Un utilisateur à Dakar appelle CloudFront (edge à Dakar ou proche).  
+La vidéo est servie localement, sans traverser l’Atlantique.
+
+✅ **Toi aujourd’hui :**  
+Tu utilises déjà CloudFront pour les vidéos S3.  
+C’est EXCELLENT. Tu es déjà au niveau TikTok sur ce point.
+
+---
+
+## 2. Caching agressif (même offline possible)
+
+**C’est quoi ?**  
+C’est le fait de garder en cache (téléphone ou CDN) des données pour ne pas les recalculer/recharger.
+
+**Niveaux de cache :**
+1. **Cache navigateur / mobile** (ex: image de profil)
+2. **Cache CDN** (ex: vidéo populaire servie sans toucher ton API)
+3. **Cache backend** (ex: Redis sur Render/Hetzner)
+
+**Aujourd’hui dans Propulse :**  
+- Tu as déjà **Redis** côté backend ✅  
+- Tu as **expo-file-system** pour les vidéos ✅  
+
+**Ce que TikTok fait en plus :**  
+Il cache **jusqu’à la réponse JSON du feed** pendant quelques secondes.
+
+👉 **Tu pourrais faire pareil :**  
+`feed utilisateur + recommandations + posts`  
+→ cache Redis 10–30s.  
+→ 10x moins de charge sur ton API.
+
+---
+
+## 3. Pré-calcul du feed (feed ranking offline)
+
+**C’est quoi ?**  
+Au lieu de calculer le feed au moment où l’utilisateur ouvre l’app, tu le calcules **AVANT**.
+
+**Exemple :**  
+Tous les jours à 3h du matin, ton serveur :
+- calcule le feed IA / trending de **chaque utilisateur actif**
+- enregistre les résultats (post IDs) en base ou Redis
+- au moment de l’affichage, il n’y a plus aucun calcul lourd
+
+✅ **Tu as déjà ça dans ton code :**  
+Redis + cron + `ai:user:${id}`
+
+**Ton point fort actuel :**  
+Tu pré-calcules déjà le feed IA pour les utilisateurs actifs. C’est très mature.
+
+**Prochaine étape possible :**  
+Pré-calculer aussi les posts populaires par sport / région.
+
+---
+
+## 4. Duplication des données proche des utilisateurs
+
+**C’est quoi ?**  
+C’est le fait de copier des données critiques sur plusieurs serveurs dans le monde.
+
+**Application typique :**
+- Liste des vidéos populaires
+- Liste des sports / régions
+- Noms des utilisateurs certifiés
+
+👉 Au lieu d’un appel API, le mobile lit une copie locale ou CDN.
+
+**TikTok / Instagram :**  
+Ils servent directement des fichiers JSON statiques depuis le CDN.
+
+**Toi aujourd’hui :**  
+Tu ne l’as pas encore vraiment, mais ce n’est pas critique à 10k utilisateurs.
+
+---
+
+## 5. Serveurs régionaux (edge servers)
+
+**C’est quoi ?**  
+Des serveurs situés physiquement près des utilisateurs :  
+- Europe, Afrique, Amérique, Asie  
+- Ils exécutent TON code (pas juste des fichiers statiques)
+
+**Ce que ça permet :**  
+- Mettre à jour un like / vue très vite
+- Lire/écrire en base locale puis synchroniser
+
+**Limite actuelle :**  
+Render / Heroku / ton serveur actuel n’est PAS edge.  
+C’est nécessaire à partir de **1–10 millions d’utilisateurs actifs**.
+
+👉 Pour l’instant : CloudFront + Redis + cache vidéo suffisent largement.
+
+---
+
+## ✅ Ce que tu as déjà (et c’est très bon)
+
+| Concept | Statut Propulse |
+|--------|----------------|
+| CDN CloudFront | ✅ |
+| Cache vidéo (expo-file-system) | ✅ |
+| Pré-calcul feed IA | ✅ (cron + Redis) |
+| Cache Redis backend | ✅ |
+| Serveurs régionaux | ❌ (pas encore nécessaire) |
+| Duplication données | ❌ (pas critique) |
+
+---
+
+## 🎯 Résumé simple (à garder en tête)
+
+> **Un CDN permet de servir les vidéos localement.  
+> Le cache évite de tout recalculer.  
+> Le pré-calcul rend le feed instantané.  
+> La duplication et les edge servers sont pour les très grandes échelles.**
+
+Tu es **déjà très bien positionné** pour une app comme Propulse Sport.
+
+Tu veux que je regarde **comment ajouter un cache Redis sur tes endpoints posts / feed ranking** ?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+**Oui, absolument.** 🎯
+
+Après cette configuration, ton app aura **une architecture identique à celle des grandes apps** sur les points critiques :
+
+---
+
+## Ce que tu auras après Cloudflare + Hetzner + CloudFront
+
+| Composant | Ce que ça fait | Comme les grands |
+|-----------|----------------|------------------|
+| **CloudFront** | Vidéos servies ultra-rapide partout | ✅ TikTok, Netflix |
+| **Cloudflare** | API et images servies depuis le edge | ✅ Instagram, Twitter |
+| **Hetzner** | Backend puissant et stable | ✅ Base de données |
+| **Cache Redis** | Pré-chargement des feeds | ✅ Recommandations IA |
+
+---
+
+## Les 3 facteurs qui rendent une app "rapide comme les grands"
+
+### 1. La latence (temps de réponse)
+
+| Sans Cloudflare | Avec Cloudflare |
+|----------------|-----------------|
+| Un utilisateur à Dakar → Hetzner (Allemagne) : **150-200ms** | Cloudflare edge à Dakar → **10-30ms** |
+| Un utilisateur à Tokyo → **300ms** | Cloudflare edge à Tokyo → **10-30ms** |
+
+👉 **Gain : 5 à 10x plus rapide**
+
+---
+
+### 2. La charge serveur
+
+| Sans Cloudflare | Avec Cloudflare |
+|----------------|-----------------|
+| Chaque requête va à ton serveur | 80-90% des requêtes sont servies par le cache Cloudflare |
+| Ton serveur fait tout le travail | Ton serveur respire |
+
+👉 **Ton serveur Hetzner peut supporter 5 à 10x plus d'utilisateurs**
+
+---
+
+### 3. L'expérience utilisateur (le ressenti)
+
+| Avant | Après |
+|-------|-------|
+| Le feed met 1-2s à charger | Le feed apparaît **instantanément** (cache API) |
+| Les images mettent du temps | Les images sont déjà sur le edge local |
+| Vidéos parfois lentes (selon CloudFront) | Vidéos rapides (CloudFront est déjà bon) |
+| L'app "rame" aux heures de pointe | L'app reste fluide (cache + répartition) |
+
+---
+
+## Ce que les grands ont EN PLUS (et que tu n'as pas besoin maintenant)
+
+| Technologie | Ce que ça coûte | Pour Propulse |
+|-------------|----------------|---------------|
+| Serveurs edge personnalisés | Millions $ | ❌ Pas nécessaire |
+| Codecs vidéo propriétaires | R&D énorme | ❌ Pas nécessaire |
+| Réplication mondiale BDD | Très cher | ❌ 10k utilisateurs |
+| Pré-chargement prédictif | IA complexe | ❌ Optionnel |
+
+👉 **Pour 10k à 500k utilisateurs, ta config est parfaite.**
+
+---
+
+## La vérité honnête
+
+Avec Cloudflare + CloudFront + Hetzner :
+
+- ✅ Ton app sera **dans le top 1% des apps React Native** en termes de perf
+- ✅ Elle sera aussi rapide qu'Instagram **pour l'essentiel des usages**
+- ✅ Elle tiendra la charge jusqu'à **500k utilisateurs actifs**
+
+**Ce qui fera la différence au-delà :**
+- La qualité de ton code (déjà excellent)
+- La rapidité de tes requêtes SQL
+- La taille de tes vidéos (compression)
+
+---
+
+## Le seul "secret" que les grands ne disent pas
+
+> **La vitesse d'une app ne vient pas d'une technologie magique, mais de la combinaison :**
+> - CDN (CloudFront) pour les fichiers lourds
+> - Cache edge (Cloudflare) pour l'API
+> - Cache local (expo-file-system) pour les médias
+> - Code optimisé (tes 5 optimisations)
+
+**Tu as TOUT ça maintenant.** ✅
+
+---
+
+## Conclusion
+
+**Oui, ton app sera rapide comme celle des grandes apps.**
+
+Mais pas parce que tu as Cloudflare.  
+Parce que tu as **construit la bonne architecture, étape par étape**, sans raccourcis.
+
+👉 Les utilisateurs ne sauront pas pourquoi c'est rapide.  
+Ils verront juste que **ça marche**, et que c'est **agréable à utiliser**.
+
+**C'est ça, une grande app.** 🚀
+
+---
+
+Tu veux que je t'aide à configurer Cloudflare pas à pas sur ton domaine ?
+
+
+
+
+
+psql "postgresql://postgres:Sakhom1979@propulse-db.cg1ikgs4y8kd.us-east-1.rds.amazonaws.com:5432/postgres" -c "SELECT \"fullName\", \"birthDate\", date_part('year', age(\"birthDate\")) as age FROM \"User\" WHERE id = 19406;"
+
+tree propulse-algo -I "node_modules|.git" --dirsfirst
+
+psql "postgresql://postgres:Sakhom1979@propulse-db.cg1ikgs4y8kd.us-east-1.rds.amazonaws.com:5432/postgres" <<EOF
+\x on
+SELECT id, "fullName", "ovr", "sportAttributes"
+FROM "User"
+WHERE "cvCompleted" = true
+LIMIT 300;
+EOF
+
+
+
+
+
+
+
+
+Oui, c'est une très bonne combinaison pour **ProPulse**.
+
+Tu peux les utiliser de plusieurs façons selon tes besoins :
+
+| Tâche                                                         | Modèle recommandé    |
+| ------------------------------------------------------------- | -------------------- |
+| Assistant conversationnel                                     | Qwen 3               |
+| Conseils sportifs personnalisés                               | Qwen 3               |
+| Raisonnement complexe                                         | DeepSeek R1          |
+| Génération de programmes d'entraînement                       | Les deux conviennent |
+| Analyse de données                                            | DeepSeek R1          |
+| Génération de contenu (articles, descriptions, notifications) | Qwen 3               |
+
+### Une architecture efficace
+
+Pour une application comme ProPulse, tu peux répartir les rôles :
+
+* **Qwen 3** : l'interface avec l'utilisateur. Il répond rapidement, comprend bien plusieurs langues, génère du contenu et gère les conversations.
+* **DeepSeek R1** : le "cerveau" pour les tâches qui demandent un raisonnement plus poussé, comme analyser les performances, construire un plan d'entraînement ou résoudre des problèmes complexes.
+
+L'application choisit automatiquement quel modèle utiliser selon la demande de l'utilisateur.
+
+### Exemple
+
+Un utilisateur demande :
+
+> "Je prépare un semi-marathon dans 12 semaines. J'ai 35 ans, je cours 3 fois par semaine et je veux finir en moins de 2 heures."
+
+* **Qwen 3** comprend la demande, pose les bonnes questions si nécessaire et présente la réponse de manière fluide.
+* **DeepSeek R1** élabore le programme d'entraînement, ajuste les intensités et justifie les recommandations.
+
+### Si tu veux aller plus loin
+
+Tu peux aussi ajouter un modèle spécialisé pour les images :
+
+* Qwen2.5-VL pour analyser des photos (posture, équipements, etc.).
+* Ou un modèle de génération d'images si tu souhaites créer automatiquement des visuels.
+
+Pour **ProPulse**, une pile technique comme **Flutter + Supabase + Qwen 3 + DeepSeek R1** est tout à fait capable de soutenir une application IA moderne, évolutive et performante.
+
+
+
+
+
+
+
+Parfait. On va le faire **comme des professionnels**, étape par étape. À la fin, tu auras **Qwen 3** et **DeepSeek R1** qui fonctionneront sur ton Mac.
+
+## Étape 1 — Vérifie ton Mac
+
+Avant de télécharger quoi que ce soit, dis-moi :
+
+1. Clique sur ** > À propos de ce Mac**.
+2. Envoie-moi une capture d'écran ou indique :
+
+   * La puce (M1, M2, M3, M4, Intel...)
+   * La mémoire (16 Go, 24 Go, 32 Go...)
+
+C'est important pour choisir la bonne version des modèles.
+
+---
+
+## Étape 2 — Installer Ollama
+
+Va sur :
+
+**[Ollama](https://ollama.com?utm_source=chatgpt.com)**
+
+1. Clique sur **Download**.
+2. Choisis **macOS**.
+3. Installe l'application comme n'importe quel logiciel.
+
+Quand c'est terminé, ouvre **Terminal** et tape :
+
+```bash
+ollama --version
+```
+
+Si tu vois un numéro de version, c'est installé.
+
+---
+
+## Étape 3 — Télécharger Qwen 3
+
+Dans le Terminal, tape :
+
+```bash
+ollama pull qwen3:8b
+```
+
+⚠️ N'utilise pas encore les versions 14B ou 32B. On commencera par la **8B**, plus légère.
+
+Le téléchargement peut prendre plusieurs minutes.
+
+---
+
+## Étape 4 — Tester Qwen
+
+Une fois le téléchargement terminé :
+
+```bash
+ollama run qwen3:8b
+```
+
+Puis écris par exemple :
+
+```
+Bonjour, présente-toi.
+```
+
+Si le modèle répond, c'est gagné.
+
+---
+
+## Étape 5 — Télécharger DeepSeek R1
+
+Toujours dans le Terminal :
+
+```bash
+ollama pull deepseek-r1:8b
+```
+
+Puis :
+
+```bash
+ollama run deepseek-r1:8b
+```
+
+Teste avec :
+
+```
+Crée un programme de musculation pour un débutant.
+```
+
+---
+
+## Étape 6 — Vérifier les modèles
+
+Tape :
+
+```bash
+ollama list
+```
+
+Tu devrais voir quelque chose comme :
+
+```text
+NAME
+qwen3:8b
+deepseek-r1:8b
+```
+
+---
+
+## Étape 7 — Intégrer dans ProPulse
+
+Une fois que tout fonctionne, je te montrerai comment :
+
+* connecter ton backend Node.js à Ollama ;
+* faire communiquer ProPulse avec les modèles ;
+* choisir automatiquement entre Qwen et DeepSeek selon le type de demande.
+
+Nous n'irons pas trop vite : on validera chaque étape avant de passer à la suivante.
+
+### 👉 Première chose à faire maintenant
+
+Réponds-moi avec :
+
+1. **Le modèle de ton Mac** (ou une capture de **À propos de ce Mac**).
+2. Le résultat de cette commande :
+
+```bash
+ollama --version
+```
+
+S'il y a une erreur, copie-la telle quelle et je t'aiderai à la résoudre.
+
+
+
+Parfait ! 🎉
+
+Ollama est **correctement installé**.
+
+```bash
+ollama version is 0.31.1
+```
+
+On peut maintenant installer les modèles.
+
+---
+
+# Étape 1 : Télécharger Qwen 3
+
+Dans le Terminal, exécute :
+
+```bash
+ollama pull qwen3:8b
+```
+
+Tu verras une progression du téléchargement. Selon ta connexion Internet, cela peut prendre quelques minutes.
+
+Quand il est terminé, lance le modèle :
+
+```bash
+ollama run qwen3:8b
+```
+
+Puis teste avec :
+
+```text
+Bonjour, je développe ProPulse. Présente-toi en quelques lignes.
+```
+
+---
+
+# Étape 2 : Télécharger DeepSeek R1
+
+Quand Qwen fonctionne, exécute :
+
+```bash
+ollama pull deepseek-r1:8b
+```
+
+Puis :
+
+```bash
+ollama run deepseek-r1:8b
+```
+
+Teste avec :
+
+```text
+Crée un programme de musculation de 4 semaines pour un débutant.
+```
+
+---
+
+# Étape 3 : Vérifier
+
+Enfin, exécute :
+
+```bash
+ollama list
+```
+
+Tu devrais voir quelque chose comme :
+
+```text
+NAME
+qwen3:8b
+deepseek-r1:8b
+```
+
+---
+
+## Ensuite, on va intégrer l'IA à ProPulse
+
+Une fois les modèles installés, je vais te montrer comment ton backend **Node.js** pourra leur parler.
+
+L'architecture sera :
+
+```text
+Flutter
+     │
+Node.js (Hetzner)
+     │
+API Ollama
+     │
+Qwen 3 + DeepSeek R1
+```
+
+Et tu pourras faire des appels comme :
+
+```javascript
+const response = await fetch("http://localhost:11434/api/chat", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "qwen3:8b",
+    messages: [
+      {
+        role: "user",
+        content: "Crée un programme de musculation."
+      }
+    ]
+  })
+});
+```
+
+---
+
+## Une dernière question
+
+Avant de télécharger, peux-tu me dire **quel est ton Mac** ?
+
+Par exemple :
+
+* MacBook Air **M2** 16 Go
+* MacBook Pro **M3** 18 Go
+* MacBook Pro **M4** 24 Go
+
+La quantité de RAM déterminera si on reste sur les versions **8B** ou si ton Mac peut faire tourner des modèles plus grands et plus performants.
+
+
+
+Excellent ! 🎉 Tu viens d'installer **Qwen 3 8B** avec succès.
+
+Le message :
+
+```text
+success
+```
+
+signifie que le modèle est maintenant **installé sur ton Mac**.
+
+## Étape suivante : le lancer
+
+Dans le Terminal, exécute :
+
+```bash
+ollama run qwen3:8b
+```
+
+Tu devrais voir un prompt où tu peux discuter avec le modèle.
+
+Par exemple, écris :
+
+```text
+Je développe une application de sport appelée ProPulse. Présente-toi.
+```
+
+S'il répond, tout fonctionne.
+
+---
+
+## Vérifie qu'il est installé
+
+Tu peux aussi exécuter :
+
+```bash
+ollama list
+```
+
+Tu devrais obtenir quelque chose comme :
+
+```text
+NAME
+qwen3:8b
+```
+
+---
+
+## Ensuite, installe DeepSeek R1
+
+Quand tu auras testé Qwen, télécharge DeepSeek :
+
+```bash
+ollama pull deepseek-r1:8b
+```
+
+Puis lance-le :
+
+```bash
+ollama run deepseek-r1:8b
+```
+
+---
+
+# 🚀 La suite pour ProPulse
+
+Une fois que les deux modèles fonctionnent, je vais te montrer comment faire en sorte que **ton backend Node.js appelle automatiquement Qwen ou DeepSeek**.
+
+Par exemple, dans ton code Node.js :
+
+```javascript
+const response = await fetch("http://localhost:11434/api/chat", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "qwen3:8b",
+    messages: [
+      {
+        role: "user",
+        content: "Crée un programme de musculation pour un débutant."
+      }
+    ]
+  })
+});
+```
+
+Tu verras que c'est très simple : ton backend envoie une requête à Ollama, qui fait tourner le modèle localement.
+
+## Je te propose de t'accompagner jusqu'au bout
+
+Comme tu construis **ProPulse** et que tu as déjà un backend Node.js, je peux te guider pour créer une architecture professionnelle :
+
+1. ✅ Installation de Qwen et DeepSeek (en cours).
+2. ✅ Connexion avec Node.js.
+3. ✅ Choisir automatiquement le bon modèle selon la demande.
+4. ✅ Ajouter une mémoire de conversation.
+5. ✅ Déployer sur un serveur GPU quand tu seras prêt.
+
+On construira cela étape par étape, comme le ferait une équipe d'ingénieurs IA.
+
+
+
+
+
+Oui, absolument. Si tu es ingénieur ML/systèmes, c'est même une excellente idée. Il faut simplement savoir que **Ollama n'est pas le dépôt source du modèle**. Ollama ne fait qu'emballer les poids et fournir un moteur d'inférence.
+
+Tu peux télécharger les **dépôts GitHub officiels** des projets.
+
+## 1. Qwen (Alibaba)
+
+Site officiel :
+
+* [Qwen Documentation](https://qwenlm.ai?utm_source=chatgpt.com)
+
+Code source :
+
+* [QwenLM GitHub](https://github.com/QwenLM/Qwen3?utm_source=chatgpt.com)
+
+Tu peux le cloner :
+
+```bash
+git clone https://github.com/QwenLM/Qwen3.git
+```
+
+Tu y trouveras notamment :
+
+* l'architecture du modèle ;
+* les scripts d'inférence ;
+* les scripts de fine-tuning ;
+* les exemples d'utilisation ;
+* la documentation technique.
+
+---
+
+## 2. DeepSeek
+
+Code officiel :
+
+* [DeepSeek GitHub](https://github.com/deepseek-ai?utm_source=chatgpt.com)
+
+Par exemple :
+
+```bash
+git clone https://github.com/deepseek-ai/DeepSeek-R1.git
+```
+
+ou pour les autres modèles :
+
+```bash
+git clone https://github.com/deepseek-ai/DeepSeek-V3.git
+```
+
+Tu y trouveras les explications sur l'entraînement, les recommandations d'inférence, les benchmarks et les exemples.
+
+---
+
+# 3. Les poids originaux
+
+Si tu veux analyser les fichiers originaux (au lieu de ceux convertis pour Ollama), tu peux les récupérer sur Hugging Face.
+
+**Qwen :**
+
+```bash
+git lfs install
+
+git clone https://huggingface.co/Qwen/Qwen3-8B
+```
+
+ou avec `huggingface-cli` :
+
+```bash
+huggingface-cli download Qwen/Qwen3-8B
+```
+
+Tu verras des fichiers comme :
+
+```
+config.json
+generation_config.json
+model.safetensors
+tokenizer.json
+tokenizer_config.json
+special_tokens_map.json
+```
+
+Le `config.json` est particulièrement intéressant : il décrit l'architecture (nombre de couches, têtes d'attention, taille cachée, longueur de contexte, etc.).
+
+---
+
+# 4. Si tu veux comprendre le fonctionnement interne
+
+Je te recommande aussi de lire le code de ces bibliothèques :
+
+* [Transformers (Hugging Face)](https://github.com/huggingface/transformers?utm_source=chatgpt.com)
+* [vLLM](https://github.com/vllm-project/vllm?utm_source=chatgpt.com)
+* [llama.cpp](https://github.com/ggml-org/llama.cpp?utm_source=chatgpt.com)
+* [Ollama](https://github.com/ollama/ollama?utm_source=chatgpt.com)
+
+En particulier :
+
+* **Transformers** montre comment les modèles sont définis en PyTorch.
+* **vLLM** explique les optimisations d'inférence (PagedAttention, gestion du KV cache, batching, etc.).
+* **llama.cpp** montre comment exécuter efficacement les modèles sur CPU et Apple Silicon.
+* **Ollama** montre comment ces composants sont orchestrés pour fournir une API simple.
+
+---
+
+## Vu ton profil
+
+Si ton objectif est vraiment de comprendre l'architecture de bout en bout, je te proposerais un parcours dans cet ordre :
+
+1. **Qwen3** (architecture et scripts).
+2. **Transformers** (implémentation PyTorch).
+3. **llama.cpp** (inférence sur CPU/Apple Silicon).
+4. **vLLM** (inférence GPU haute performance).
+5. **Ollama** (orchestration et API).
+
+Tu comprendras ainsi tout le pipeline, depuis la définition du modèle jusqu'à son exécution en production. C'est le parcours qu'empruntent de nombreux ingénieurs qui construisent leur propre plateforme d'inférence ou souhaitent adapter ces modèles à leurs besoins.
+
+
+
+
+
+Parfait ! 🎉
+
+Tu as maintenant les deux modèles installés avec succès.
+
+```bash
+ollama list
+```
+
+devrait maintenant afficher :
+
+```text
+NAME
+qwen3:8b
+deepseek-r1:8b
+```
+
+Si ce n'est pas encore le cas, exécute simplement :
+
+```bash
+ollama list
+```
+
+---
+
+# 🎯 Tu possèdes maintenant
+
+✅ Qwen 3 8B
+
+✅ DeepSeek R1 8B
+
+Ils sont stockés sur ton Mac dans le répertoire d'Ollama.
+
+---
+
+# Maintenant on va faire comme une vraie équipe IA
+
+Je te propose ce parcours (je vais t'accompagner jusqu'au déploiement sur ton serveur Hetzner).
+
+## Phase 1 — Comprendre les modèles
+
+On va récupérer :
+
+* le code source de Qwen
+* le code source de DeepSeek
+* les articles de recherche (papers)
+* les poids originaux sur Hugging Face
+
+Ainsi tu pourras analyser :
+
+* Multi Head Attention
+* RoPE
+* GQA
+* KV Cache
+* MoE (si présent)
+* RMSNorm
+* SwiGLU
+* Flash Attention
+* etc.
+
+---
+
+## Phase 2 — Les utiliser
+
+On construira une API Node.js comme celle-ci :
+
+```
+Flutter
+
+        │
+
+Node.js
+
+        │
+
+AI Router
+
+ ┌──────────────┐
+ │              │
+ ▼              ▼
+
+Qwen       DeepSeek
+```
+
+Le backend décidera automatiquement :
+
+* conversation → Qwen
+
+* raisonnement → DeepSeek
+
+---
+
+## Phase 3 — Mémoire IA
+
+On ajoutera :
+
+* PostgreSQL
+* Redis
+* Vector Database
+
+afin que ProPulse puisse retenir :
+
+* les objectifs sportifs
+
+* les blessures
+
+* le matériel
+
+* l'historique
+
+* les préférences
+
+---
+
+## Phase 4 — Déploiement
+
+Quand tout sera validé sur ton Mac :
+
+```
+Mac
+     ↓
+
+Hetzner Node.js
+
+     ↓
+
+Serveur GPU
+
+     ↓
+
+Qwen + DeepSeek
+```
+
+---
+
+# Vu ton profil
+
+Tu m'as dit que tu es :
+
+> **ingénieur et architecte systèmes Machine Learning**
+
+Dans ce cas, je pense qu'on peut aller beaucoup plus loin qu'une simple intégration.
+
+Je peux t'expliquer **ligne par ligne** :
+
+* pourquoi Qwen est construit ainsi ;
+* comment DeepSeek implémente son raisonnement ;
+* comment Ollama charge les modèles GGUF ;
+* comment fonctionne le tokenizer ;
+* comment les embeddings sont générés ;
+* comment le KV Cache est géré ;
+* comment les tokens sont produits un par un ;
+* comment construire ton propre moteur d'inférence.
+
+Autrement dit, on ne se limitera pas à "utiliser" les modèles : on étudiera leur architecture interne, puis on construira une infrastructure IA professionnelle adaptée à ProPulse. C'est un excellent objectif si tu veux maîtriser toute la chaîne, de l'architecture du modèle jusqu'à son exploitation en production.
+
+
+
+cont If fonctionnaliter role = fonction simple 
+Const If routage de cryptage = dCertifcat Algora
+Const If routeSimple = RoutageSimple 
+
+
+
+
+
+
+
